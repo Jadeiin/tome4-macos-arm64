@@ -21,7 +21,6 @@ jobs:
     env:
       HOMEBREW_NO_AUTO_UPDATE: '1'
       HOMEBREW_NO_INSTALL_CLEANUP: '1'
-      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/python-cache
       TOME_BUILD_JOBS: '3'
     steps:
       - name: Check out native build sources
