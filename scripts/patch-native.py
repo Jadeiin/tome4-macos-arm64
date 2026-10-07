@@ -10,7 +10,7 @@ ORIGINALS = ROOT / "patches" / "upstream"
 def replace(relative, old, new):
     path = SOURCE / relative
     original = path.read_text()
-    if new in original:
+    if new in original and (old not in original or old in new):
         return
     if old not in original:
         raise RuntimeError(f"Expected source text missing: {relative}")
