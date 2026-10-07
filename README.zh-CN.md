@@ -44,7 +44,7 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 版本控制维护以下内容：
 
 - `scripts/build-native.py`：Apple Clang 原生构建，排除旧 Lua、Steam 和旧内嵌浏览器。
-- `scripts/NativeMain.m`：Cocoa 启动和应用资源目录。
+- `scripts/NativeMain.m`：Cocoa 启动、应用资源目录，以及切换应用时的独占全屏恢复。详见[全屏问题复现记录](docs/macos-fullscreen.md)。
 - `scripts/NativeLua.c`：PhysFS 虚拟文件加载，以及原版 `table.sort(list, "字段名")` 扩展。
 - `scripts/lua51-resolvers.lua`：优先执行可在当前阶段处理的 instant resolver，避免铭文依赖未解析。文件名沿用最初的诊断版本，当前运行时为 LuaJIT。
 - `scripts/patch-native.py`、`patches/native-arm64.patch`：幂等应用和记录 macOS 兼容补丁。

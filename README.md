@@ -44,7 +44,7 @@ macOS provides system libraries and frameworks. Repackaging after a Homebrew upd
 Version control tracks:
 
 - `scripts/build-native.py`: native builds with Apple Clang, excluding the old Lua runtime, Steam integration, and legacy embedded browser.
-- `scripts/NativeMain.m`: Cocoa startup and app resource directory handling.
+- `scripts/NativeMain.m`: Cocoa startup, app resource directory handling, and exclusive fullscreen restoration when switching applications. See the [fullscreen investigation](docs/macos-fullscreen.md).
 - `scripts/NativeLua.c`: loading through the PhysFS virtual filesystem and the original `table.sort(list, "field")` extension.
 - `scripts/lua51-resolvers.lua`: runs instant resolvers that can be handled at the current stage first, avoiding unresolved inscription dependencies. The filename comes from the original diagnostic version; the current runtime uses LuaJIT.
 - `scripts/patch-native.py` and `patches/native-arm64.patch`: idempotent application and recording of macOS compatibility patches.
