@@ -1,0 +1,125 @@
+name: Native ARM64 DMG
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      PYTHONPYCACHEPREFIX: ${{ runner.temp }}/python-cache
+      TOME_BUILD_JOBS: '3'
+    steps:
+      - name: Check out native build sources
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Require native Apple Silicon
+        run: |
+          test "$(uname -m)" = arm64
+          test "$(/usr/sbin/sysctl -in sysctl.proc_translated 2>/dev/null || true)" != 1
+          /usr/bin/xcrun --sdk macosx --show-sdk-version
+
+      - name: Install build dependencies
+        run: /opt/homebrew/bin/brew bundle install --file=Brewfile --no-upgrade
+
+      - name: Download and verify official source
+        run: |
+          /usr/bin/python3 scripts/check-release-tools.py
+          /usr/bin/python3 scripts/fetch-source.py
+
+      - name: Build native engine
+        run: /usr/bin/python3 scripts/build-native.py
+
+      - name: Check LuaJIT compatibility
+        run: |
+          /usr/bin/python3 scripts/check-luajit-vfs.py
+          /usr/bin/python3 scripts/check-lua51-resolvers.py
+          /usr/bin/python3 scripts/check-talent-coroutines.py
+
+      - name: Package app with its runtime libraries
+        run: |
+          /usr/bin/python3 scripts/package-native.py --without-dlcs
+          /usr/bin/python3 scripts/verify-native.py
+          /usr/bin/python3 scripts/check-bundled-runtime.py
+
+      - name: Check actual first floor and skill targeting
+        env:
+          ALSOFT_DRIVERS: 'null'
+        run: /usr/bin/python3 scripts/check-first-floor.py --talents --seconds 180
+
+      - name: Create DMG and corresponding source archive
+        run: /usr/bin/python3 scripts/make-release.py
+
+      - name: Save release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-arm64-release
+          path: dist/release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Save build and test logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-arm64-logs
+          path: |
+            logs/
+            build/native/build-config.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release tools
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Retrieve verified release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: native-arm64-release
+          path: dist/release/
+
+      - name: Verify downloaded release files
+        working-directory: dist/release
+        run: sha256sum --check SHA256SUMS
+
+      - name: Publish Release with GitHub CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            dist/release/*.dmg \
+            dist/release/*-source.tar.gz \
+            dist/release/build-info.json \
+            dist/release/SHA256SUMS \
+            --verify-tag \
+            --title "ToME Apple Silicon — $RELEASE_TAG" \
+            --notes-file dist/release/release-notes.md

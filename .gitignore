@@ -1,0 +1,20 @@
+# Only maintain the native port, not downloaded resources or local user data.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/Brewfile
+!/project.json
+!/.github/
+!/scripts/
+!/patches/
+/patches/*
+!/patches/native-arm64.patch
+
+# Obsolete Lua 5.1/audio experiments are retained locally.
+/scripts/check-lua-format.c
+/scripts/check-openal.c
+**/__pycache__/
+**/*.pyc
+**/.DS_Store
+

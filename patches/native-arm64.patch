@@ -1,0 +1,399 @@
+--- a/bootstrap/boot.lua
++++ b/bootstrap/boot.lua
+@@ -22,7 +22,8 @@
+ 	else
+ 		-- This is a little un-OSX like: we grab our data from the folder containing T-Engine.app
+ 		-- It is a bit strange but way way better for people to install addons and such
+-		dir = dir:gsub("(.*"..fs.getPathSeparator()..").+", "%1"):gsub("(.*"..fs.getPathSeparator()..").+", "%1"):gsub("(.*"..fs.getPathSeparator()..").+", "%1")
++		-- The native macOS core already returns Contents/Resources/.
++		dir = dir
+ --		dir = dir:gsub("(.*"..fs.getPathSeparator()..").+", "%1")..fs.getPathSeparator().."Resources"..fs.getPathSeparator()
+ 	end
+ 
+--- a/game/loader/init.lua
++++ b/game/loader/init.lua
+@@ -182,6 +182,16 @@
+ 			prev = apply_superloads(prev, __addons_fn_superloads[addon][bname])
+ 		end
+ 	end
++	if bname == "engine.Entity" then
++		local original = prev
++		prev = function(...)
++			local result = original(...)
++			local install, err = loadfile("/loader/native-lua51.lua")
++			assert(install, err)
++			install()(package.loaded[bname])
++			return result
++		end
++	end
+ 	return prev
+ end
+ 
+--- a/src/core_lua.c
++++ b/src/core_lua.c
+@@ -40,7 +40,7 @@
+ #include <locale.h>
+ 
+ #ifdef __APPLE__
+-#include <libpng/png.h>
++#include <png.h>
+ #else
+ #include <png.h>
+ #endif
+--- a/src/getself.c
++++ b/src/getself.c
+@@ -19,6 +19,8 @@
+     darkgod@te4.org
+ */
+ #include "getself.h"
++#include <stdlib.h>
++#include <stdint.h>
+ 
+ #if defined(SELFEXE_LINUX)
+ #include <limits.h>
+@@ -90,7 +92,7 @@
+ 
+ const char *get_self_executable(int argc, char **argv)
+ {
+-	size_t sz = 0;
++	uint32_t sz = 0;
+ 	char *buf;
+ 	char *sl;
+ 
+@@ -99,7 +101,17 @@
+ 	_NSGetExecutablePath(buf, &sz);
+ 
+ 	sl = strrchr(buf, '/');
++	if (!sl) { free(buf); return NULL; }
+ 	*(sl + 1) = '\0';
++	/* Keep the complete game inside the application bundle. */
++	const char *suffix = "/Contents/MacOS/";
++	size_t len = strlen(buf), suffix_len = strlen(suffix);
++	if (len >= suffix_len && !strcmp(buf + len - suffix_len, suffix)) {
++		char *resources = realloc(buf, len + 5);
++		if (!resources) { free(buf); return NULL; }
++		buf = resources;
++		strcpy(buf + len - suffix_len, "/Contents/Resources/");
++	}
+ 	return buf;
+ }
+ 
+--- a/src/lpeg/lptypes.h
++++ b/src/lpeg/lptypes.h
+@@ -15,6 +15,7 @@
+ 
+ #include <assert.h>
+ 
++#include <limits.h>
+ #include "lua.h"
+ 
+ 
+--- a/src/lua/lstrlib.c
++++ b/src/lua/lstrlib.c
+@@ -753,6 +753,29 @@
+ }
+ 
+ 
++/* Match LuaJIT's %s conversion, which ToME uses during character creation. */
++static const char *format_tostring (lua_State *L, int arg, size_t *len) {
++  if (lua_type(L, arg) == LUA_TSTRING)
++    return lua_tolstring(L, arg, len);
++  if (luaL_callmeta(L, arg, "__tostring"))
++    lua_replace(L, arg);
++  switch (lua_type(L, arg)) {
++    case LUA_TNUMBER: case LUA_TSTRING:
++      return lua_tolstring(L, arg, len);
++    case LUA_TNIL:
++      lua_pushliteral(L, "nil");
++      break;
++    case LUA_TBOOLEAN:
++      lua_pushstring(L, lua_toboolean(L, arg) ? "true" : "false");
++      break;
++    default:
++      lua_pushfstring(L, "%s: %p", luaL_typename(L, arg), lua_topointer(L, arg));
++      break;
++  }
++  lua_replace(L, arg);
++  return lua_tolstring(L, arg, len);
++}
++
+ static int str_format (lua_State *L) {
+   int top = lua_gettop(L);
+   int arg = 1;
+@@ -798,7 +821,7 @@
+         }
+         case 's': {
+           size_t l;
+-          const char *s = luaL_checklstring(L, arg, &l);
++          const char *s = format_tostring(L, arg, &l);
+           if (!strchr(form, '.') && l >= 100) {
+             /* no precision and string is too long to be formatted;
+                keep original string */
+--- a/src/lxp/lxplib.c
++++ b/src/lxp/lxplib.c
+@@ -66,7 +66,7 @@
+ 
+ 
+ static void lxpclose (lua_State *L, lxp_userdata *xpu) {
+-  lua_unref(L, xpu->tableref);
++  luaL_unref(L, LUA_REGISTRYINDEX, xpu->tableref);
+   xpu->tableref = LUA_REFNIL;
+   if (xpu->parser)
+     XML_ParserFree(xpu->parser);
+@@ -225,7 +225,7 @@
+   child->parser = XML_ExternalEntityParserCreate(p, context, NULL);
+   if (!child->parser)
+     luaL_error(L, "XML_ParserCreate failed");
+-  lua_getref(L, xpu->tableref);  /* child uses the same table of its father */
++  lua_rawgeti(L, LUA_REGISTRYINDEX, xpu->tableref);  /* child uses the same table of its father */
+   child->tableref = luaL_ref(L, LUA_REGISTRYINDEX);
+   lua_pushstring(L, base);
+   lua_pushstring(L, systemId);
+@@ -449,7 +449,7 @@
+   xpu->state = XPSok;
+   xpu->b = &b;
+   lua_settop(L, 2);
+-  lua_getref(L, xpu->tableref);  /* to be used by handlers */
++  lua_rawgeti(L, LUA_REGISTRYINDEX, xpu->tableref);  /* to be used by handlers */
+   status = XML_Parse(xpu->parser, s, (int)len, s == NULL);
+   if (xpu->state == XPSstring) dischargestring(xpu);
+   if (xpu->state == XPSerror) {  /* callback error? */
+@@ -517,7 +517,7 @@
+   return 1;
+ }
+ 
+-static const struct luaL_reg lxp_meths[] = {
++static const luaL_Reg lxp_meths[] = {
+   {"parse", lxp_parse},
+   {"close", lxp_close},
+   {"__gc", parser_gc},
+@@ -530,7 +530,7 @@
+   {NULL, NULL}
+ };
+ 
+-static const struct luaL_reg lxp_funcs[] = {
++static const luaL_Reg lxp_funcs[] = {
+   {"new", lxp_make_parser},
+   {NULL, NULL}
+ };
+--- a/src/main.c
++++ b/src/main.c
+@@ -1068,6 +1068,17 @@
+ 
+ }
+ 
++/* OpenGL windows cannot also have an SDL software window surface.
++ * The legacy screen object is only used for dimensions and pixel format. */
++static void updateScreenInfo(void)
++{
++	int width, height;
++	SDL_GetWindowSize(window, &width, &height);
++	SDL_FreeSurface(screen);
++	screen = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
++	if (!screen) { fprintf(stderr, "Screen allocation failed: %s\n", SDL_GetError()); exit(1); }
++}
++
+ /* @see main.h#do_resize */
+ void do_resize(int w, int h, bool fullscreen, bool borderless, float zoom)
+ {
+@@ -1088,6 +1099,7 @@
+ 		SDL_DestroyWindow(window);
+ 		maincontext = 0;
+ 		window = 0;
++		SDL_FreeSurface(screen);
+ 		screen = 0;
+ 		/* Clean up the old window icon */
+ 		SDL_FreeSurface(windowIconSurface);
+@@ -1112,10 +1124,17 @@
+ 		}
+ 		is_fullscreen = fullscreen;
+ 		is_borderless = borderless;
+-		screen = SDL_GetWindowSurface(window);
++		updateScreenInfo();
+ 		maincontext = SDL_GL_CreateContext(window);
+-		SDL_GL_MakeCurrent(window, maincontext);
+-		glewInit();
++		if (!maincontext || SDL_GL_MakeCurrent(window, maincontext) != 0) {
++			fprintf(stderr, "OpenGL context creation failed: %s\n", SDL_GetError());
++			exit(1);
++		}
++		GLenum glew_status = glewInit();
++		if (glew_status != GLEW_OK) {
++			fprintf(stderr, "GLEW initialization failed: %s\n", glewGetErrorString(glew_status));
++			exit(1);
++		}
+ 
+ 		/* Set the window icon. */
+ 		windowIconSurface = IMG_Load_RW(PHYSFSRWOPS_openRead(WINDOW_ICON_PATH)
+@@ -1178,7 +1197,7 @@
+ 		}
+ 
+ 		/* Finally, update the screen info */
+-		screen = SDL_GetWindowSurface(window);
++		updateScreenInfo();
+ 
+ 	}
+ 
+@@ -1490,7 +1509,7 @@
+ 	if (!is_zygote) {
+ 		const char *logname = "/tmp/te4_log.txt";
+ 		logfile = freopen(logname, "w", stdout);
+-		if (os_autoflush) setlinebuf(logfile);
++		if (logfile) setlinebuf(logfile);
+ 	}
+ #endif
+ 
+@@ -1772,4 +1791,5 @@
+ #ifdef SELFEXE_MACOSX
+ 	fclose(stdout);
+ #endif
+-}
++	return 0;
++}
+--- a/src/music.c
++++ b/src/music.c
+@@ -121,6 +121,8 @@
+ 	}
+ 	alcMakeContextCurrent(audioContext);
+ 	alDistanceModel(AL_NONE);
++	printf("OpenAL vendor: %s; renderer: %s; version: %s\n",
++		alGetString(AL_VENDOR), alGetString(AL_RENDERER), alGetString(AL_VERSION));
+ 	return 1;
+ }
+ 
+--- a/src/music.h
++++ b/src/music.h
+@@ -22,8 +22,8 @@
+ #define _MUSIC_H_
+ 
+ #ifdef __APPLE__
+-#include <OpenAL/al.h>
+-#include <OpenAL/alc.h>
++#include <AL/al.h>
++#include <AL/alc.h>
+ #include <vorbis/vorbisfile.h>
+ #include <SDL2/SDL.h>
+ #include <SDL2/SDL_thread.h>
+--- a/src/particles.c
++++ b/src/particles.c
+@@ -25,6 +25,7 @@
+ #include "core_lua.h"
+ #include "auxiliar.h"
+ #include "types.h"
++#include "lua_externs.h"
+ #include "core_lua.h"
+ #include <setjmp.h>
+ #include "particles.h"
+--- a/src/physfs/archivers/bind_physfs.c
++++ b/src/physfs/archivers/bind_physfs.c
+@@ -195,7 +195,7 @@
+ 
+ 
+ static fvoid *doOpen(dvoid *opaque, const char *name,
+-                     void *(*openFunc)(const char *filename),
++                     PHYSFS_File *(*openFunc)(const char *filename),
+                      int *fileExists)
+ {
+     char *f = __BIND_PHYSFS_toDependent((char *) opaque, name, NULL);
+--- a/src/physfs/physfs_platforms.h
++++ b/src/physfs/physfs_platforms.h
+@@ -12,7 +12,12 @@
+  *  PHYSFS_PLATFORM_UNIX on that system.
+  */
+ 
+-#if (defined __HAIKU__)
++#if defined(TE4_NATIVE_MACOS)
++/* Use the existing POSIX implementation instead of obsolete Carbon APIs. */
++#  define PHYSFS_PLATFORM_UNIX
++#  define PHYSFS_PLATFORM_POSIX
++#  define PHYSFS_NO_CDROM_SUPPORT
++#elif (defined __HAIKU__)
+ #  define PHYSFS_PLATFORM_HAIKU
+ #  define PHYSFS_PLATFORM_BEOS
+ #  define PHYSFS_PLATFORM_POSIX
+--- a/src/physfs.c
++++ b/src/physfs.c
+@@ -30,6 +30,7 @@
+ #include "zlib.h"
+ #include "types.h"
+ #include "main.h"
++#include "NativeLua.h"
+ 
+ /******************************************************************
+  ******************************************************************
+@@ -635,6 +636,7 @@
+ 	auxiliar_newclass(L, "physfs{file}", fsfile_reg);
+ 	auxiliar_newclass(L, "physfs{zip}", fszipfile_reg);
+ 	luaL_openlib(L, "fs", fslib, 0);
++	te4_native_lua_init(L);
+ 
+ 	lua_settop(L, 0);
+ 	return 1;
+--- a/src/tSDL.h
++++ b/src/tSDL.h
+@@ -1,8 +1,8 @@
+ #ifdef __APPLE__
+ #include <SDL2/SDL.h>
+-#include <SDL2_ttf/SDL_ttf.h>
++#include <SDL2/SDL_ttf.h>
+ //#include <SDL2_mixer/SDL_mixer.h>
+-#include <SDL2_image/SDL_image.h>
++#include <SDL2/SDL_image.h>
+ #elif defined(__FreeBSD__)
+ #include <SDL2/SDL.h>
+ #include <SDL2/SDL_ttf.h>
+--- a/src/zlib/zutil.h
++++ b/src/zlib/zutil.h
+@@ -130,7 +130,7 @@
+ #  endif
+ #endif
+ 
+-#if defined(MACOS) || defined(TARGET_OS_MAC)
++#if (defined(MACOS) || defined(TARGET_OS_MAC)) && !defined(__APPLE__)
+ #  define OS_CODE  7
+ #  ifndef Z_SOLO
+ #    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os
+--- /dev/null
++++ b/game/loader/native-lua51.lua
+@@ -0,0 +1,41 @@
++-- Native Lua 5.1 compatibility for the engine's documented instant resolvers.
++-- Installed before Entity methods are inherited by Actor/Object subclasses.
++return function(Entity)
++	if Entity.__native_lua51_resolvers then return end
++	local resolve = Entity.resolve
++	assert(type(resolve) == "function", "Entity.resolve is unavailable")
++
++	function Entity:resolve(t, last, on_entity, key_chain)
++		t = t or self
++		key_chain = key_chain or {}
++		local instant = {}
++		for k, value in pairs(t) do
++			if type(value) == "table" and value.__resolver and value.__resolve_instant
++				and (not value.__resolve_last or last) then
++				instant[k] = value
++			end
++		end
++		local function calculate(value, k)
++			local calculator = resolvers.calc[value.__resolver]
++			if not calculator then
++				error("missing resolver "..value.__resolver.." on entity "..tostring(t).." key "..table.concat(key_chain, "."))
++			end
++			return calculator(value, on_entity or self, self, t, k, key_chain)
++		end
++		for k, value in pairs(instant) do
++			-- A preceding resolver may have changed another field.
++			if t[k] == value then
++				local result = calculate(value, k)
++				t[k] = result
++				-- Preserve upstream handling of an immediately returned resolver.
++				if type(result) == "table" and result.__resolver and result.__resolve_instant
++					and (not result.__resolve_last or last) then
++					t[k] = calculate(result, k)
++				end
++			end
++		end
++		return resolve(self, t, last, on_entity, key_chain)
++	end
++	Entity.__native_lua51_resolvers = true
++	print("[NATIVE LUA51] instant resolver priority enabled")
++end
