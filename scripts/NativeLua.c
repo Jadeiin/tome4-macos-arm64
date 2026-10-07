@@ -1,4 +1,4 @@
-/* Restore ToME's PhysFS loading API when using an unmodified system LuaJIT. */
+/* Restore ToME's math, sorting and PhysFS loading APIs for system LuaJIT. */
 #include <stddef.h>
 #include <string.h>
 #include "lua.h"
@@ -61,6 +61,7 @@ void te4_native_lua_init(lua_State *L)
     /* Preserve ToME's field-key table.sort extension. Lua dofile keeps talent
      * coroutines yieldable; the module searcher must use the virtual filesystem. */
     const char *bridge =
+        "math.mod = math.fmod\n"
         "local sort = table.sort\n"
         "function table.sort(list, compare)\n"
         " if compare ~= nil and type(compare) ~= 'function' then\n"
@@ -89,6 +90,6 @@ void te4_native_lua_init(lua_State *L)
         " return table.concat(errors)\n"
         "end\n";
     if (luaL_loadbuffer(L, bridge, strlen(bridge), "@native-luajit-vfs") || lua_pcall(L, 0, 0, 0))
-        luaL_error(L, "Native LuaJIT filesystem setup failed: %s", lua_tostring(L, -1));
+        luaL_error(L, "Native LuaJIT initialization failed: %s", lua_tostring(L, -1));
     lua_settop(L, top);
 }

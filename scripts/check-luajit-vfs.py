@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the game's PhysFS file-loading bridge against the native LuaJIT library."""
+"""Check ToME's math, sorting and PhysFS APIs against native LuaJIT."""
 import platform
 import shlex
 import subprocess
@@ -11,13 +11,40 @@ BUILD = ROOT / "build/native/checks"
 if platform.machine() != "arm64":
     raise SystemExit("Run the check from an ARM64 terminal.")
 BUILD.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(SOURCE / f"game/modules/tome-{VERSION}.team") as z:
+    physical = z.read("data/timed_effects/physical.lua").decode()
+effects = []
+for name in ["DUAL_WEAPON_DEFENSE", "PARRY", "COUNTER_ATTACKING", "DEFENSIVE_GRAPPLING"]:
+    start = physical.rfind("\nnewEffect{", 0, physical.index(f'name = "{name}"')) + 1
+    end = physical.index("\nnewEffect{", start + 1)
+    effects.append(physical[start:end])
 archive = BUILD / "luajit-vfs.zip"
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("fixtures/module.lua", 'return {name="native virtual module"}\n')
     z.writestr("fixtures/yield.lua", 'return coroutine.yield("waiting",nil,3)\n')
     z.writestr("fixtures/invalid.lua", 'local = invalid syntax\n')
+    z.writestr("fixtures/physical-effects.lua", "\n".join(effects))
     z.writestr("fixtures/check.lua", r'''
 assert(jit.arch=="arm64" and jit.status())
+local effects = {}
+_t=function(s) return s end
+newEffect=function(effect) effects[effect.name]=effect end
+util={bound=function(n,lo,hi) return math.min(hi,math.max(lo,n)) end}
+dofile("/fixtures/physical-effects.lua")
+local actor={attr=function() return false end,isUnarmed=function() return true end}
+for _,case in ipairs{
+ {"DUAL_WEAPON_DEFENSE","deflectchance","deflects"},
+ {"PARRY","deflectchance","deflects"},
+ {"COUNTER_ATTACKING","counterchance","counterattacks"},
+ {"DEFENSIVE_GRAPPLING","throwchance","throws"},
+} do
+ local chance=effects[case[1]][case[2]]
+ for _,value in ipairs{{0,0},{0.5,30},{1,60},{1.5,60}} do
+  assert(chance(actor,{chance=60,[case[3]]=value[1]})==value[2],case[1])
+ end
+end
+assert(effects.PARRY.deflectchance(actor,{chance=60,deflects=0.5},1/3)==10)
+assert(math.mod(-5,3)==-2 and math.mod(5,-3)==2 and math.mod(1.75,1)==0.75)
 local unlocks={{order=3},{order=1},{order=2}}
 table.sort(unlocks,"order")
 assert(unlocks[1].order==1 and unlocks[2].order==2 and unlocks[3].order==3)
@@ -42,7 +69,7 @@ end)
 local result=pack(coroutine.resume(co))
 assert(result.n==4 and result[1] and result[2]=="waiting" and result[3]==nil and result[4]==3)
 assert(coroutine.resume(co,8,nil,9) and coroutine.status(co)=="dead")
-print("PASS: native LuaJIT ToME field-key/default/callback sorting, PhysFS archive loadfile/require, missing/syntax errors, and yieldable dofile")
+print("PASS: native LuaJIT original parry/counter/grapple effects and math.mod, ToME field-key/default/callback sorting, PhysFS archive loadfile/require, missing/syntax errors, and yieldable dofile")
 ''')
 objects = []
 obj = ROOT / "build/native/obj/t-engine4-src-1.7.6/src"
