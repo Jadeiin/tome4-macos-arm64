@@ -1,9 +1,8 @@
--- Native Lua 5.1 compatibility for the engine's documented instant resolvers.
+-- Resolve the engine's documented instant resolvers before dependent fields.
 -- Installed before Entity methods are inherited by Actor/Object subclasses.
 return function(Entity)
 	if Entity.__native_lua51_resolvers then return end
 	local resolve = Entity.resolve
-	assert(type(resolve) == "function", "Entity.resolve is unavailable")
 
 	function Entity:resolve(t, last, on_entity, key_chain)
 		t = t or self
@@ -16,11 +15,7 @@ return function(Entity)
 			end
 		end
 		local function calculate(value, k)
-			local calculator = resolvers.calc[value.__resolver]
-			if not calculator then
-				error("missing resolver "..value.__resolver.." on entity "..tostring(t).." key "..table.concat(key_chain, "."))
-			end
-			return calculator(value, on_entity or self, self, t, k, key_chain)
+			return resolvers.calc[value.__resolver](value, on_entity or self, self, t, k, key_chain)
 		end
 		for k, value in pairs(instant) do
 			-- A preceding resolver may have changed another field.

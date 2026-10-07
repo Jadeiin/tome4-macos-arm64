@@ -43,14 +43,12 @@ def main():
         tag = os.environ["GITHUB_REF"][len("refs/tags/"):]
     build_id = validate_tag(tag) if tag else f"v{VERSION}-arm64-dev-{commit[:12]}"
     dlcs = APP / "Contents/Resources/game/dlcs"
-    if dlcs.exists() and any(path.is_file() for path in dlcs.rglob("*")):
+    if any(path.is_file() for path in dlcs.rglob("*")):
         raise RuntimeError("Public DMGs must use package-native.py --without-dlcs.")
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(APP)], check=True)
     with (APP / "Contents/Info.plist").open("rb") as stream:
         minimum_macos = plistlib.load(stream)["LSMinimumSystemVersion"]
     directory = ROOT / "dist/release"
-    if directory.exists() and any(directory.iterdir()):
-        raise RuntimeError(f"Release output already contains files; keep or move them before rebuilding: {directory}")
     directory.mkdir(parents=True, exist_ok=True)
     stem = f"Tales-of-MajEyal-{build_id.removeprefix('v')}"
     dmg = directory / f"{stem}.dmg"
@@ -64,10 +62,11 @@ def main():
             "Runtime libraries are bundled; Homebrew and Rosetta are not required.\n"
             "This community build uses ad hoc signing and is not notarized.\n"
             "Paid DLCs are not included. See the repository README for local import.\n")
-        subprocess.run(["/usr/bin/hdiutil", "create", "-volname", f"ToME {VERSION} ARM64",
+        subprocess.run(["/usr/bin/hdiutil", "create", "-ov", "-volname", f"ToME {VERSION} ARM64",
                         "-srcfolder", str(stage), "-fs", "HFS+", "-format", "UDZO", str(dmg)], check=True)
     subprocess.run(["/usr/bin/hdiutil", "verify", str(dmg)], check=True)
-    make_sources(directory / f"{stem}-source.tar.gz", commit, stem + "-source")
+    sources = directory / f"{stem}-source.tar.gz"
+    make_sources(sources, commit, stem + "-source")
     runtime = json.loads((APP / "Contents/Resources/runtime-libraries.json").read_text())
     manifest = {"version": VERSION, "build_id": build_id, "commit": commit,
                 "architecture": "arm64", "minimum_macos": minimum_macos,
@@ -75,7 +74,8 @@ def main():
                 "signing": "ad hoc; not notarized", "upstream": PROJECT,
                 "runtime_libraries": runtime}
     (directory / "build-info.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    records = [(path.name, sha256(path)) for path in sorted(directory.iterdir()) if path.is_file()]
+    files = [dmg, sources, directory / "build-info.json"]
+    records = [(path.name, sha256(path)) for path in sorted(files)]
     (directory / "SHA256SUMS").write_text("".join(f"{digest}  {name}\n" for name, digest in records))
     (directory / "release-notes.md").write_text(
         f"Native Apple Silicon build of Tales of Maj'Eyal {VERSION}.\n\n"
@@ -91,4 +91,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

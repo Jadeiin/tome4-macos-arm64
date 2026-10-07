@@ -1,21 +1,15 @@
-# Only maintain the native port, not downloaded resources or local user data.
-/*
-!/.gitignore
-!/README.md
-!/README.zh-CN.md
-!/LICENSE
-!/Brewfile
-!/project.json
-!/.github/
-!/scripts/
-!/patches/
-/patches/*
-!/patches/native-arm64.patch
+# Downloads, extracted upstream sources and generated output.
+/downloads/
+/t-engine4-src-*/
+/build/
+/dist/
+/logs/
+/patches/upstream/
 
-# Obsolete Lua 5.1/audio experiments are retained locally.
-/scripts/check-lua-format.c
-/scripts/check-openal.c
-**/__pycache__/
-**/*.pyc
-**/.DS_Store
+# Local dependency and settings backups.
+/backups/
+/settings-backups/
 
+__pycache__/
+*.pyc
+.DS_Store

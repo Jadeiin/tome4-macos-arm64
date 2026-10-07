@@ -114,7 +114,7 @@ Complete the build and checks above, then run:
 /usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.3
 ```
 
-Output is written to `dist/release/`. Keep or move existing release files before packaging again.
+Output is written to `dist/release/`. Rebuilding the same version replaces its generated files.
 Regular local builds retain imported DLC; public DMG packaging rejects apps containing DLC files.
 
 ## Import purchased DLC
@@ -124,7 +124,7 @@ Regular local builds retain imported DLC; public DMG packaging rejects apps cont
 /usr/bin/python3 scripts/package-native.py
 ```
 
-DLC files come from your own Steam installation and are copied and verified locally. Class and race unlocks still follow the game’s rules.
+DLC archives come from your own Steam installation; their integrity is checked before copying them locally. Class and race unlocks still follow the game’s rules.
 
 ## Sources and licenses
 

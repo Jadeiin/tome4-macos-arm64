@@ -3,19 +3,16 @@
 import difflib
 from pathlib import Path
 
-from project import ROOT, SOURCE, VERSION
+from project import ROOT, SOURCE
 ORIGINALS = ROOT / "patches" / "upstream"
-patches = []
 
 
 def replace(relative, old, new):
     path = SOURCE / relative
     original = path.read_text()
-    if new in original and (old not in original or old in new):
+    if new in original:
         return
     if old not in original:
-        if new in original:
-            return
         raise RuntimeError(f"Expected source text missing: {relative}")
     modified = original.replace(old, new, 1)
     upstream = ORIGINALS / relative
@@ -23,9 +20,7 @@ def replace(relative, old, new):
         upstream.parent.mkdir(parents=True, exist_ok=True)
         upstream.write_text(original)
     path.write_text(modified)
-    patches.extend(difflib.unified_diff(
-        original.splitlines(True), modified.splitlines(True),
-        fromfile=f"a/{relative}", tofile=f"b/{relative}"))
+    print(f"Patched {relative}")
 
 
 replace("src/tSDL.h", "#include <SDL2_ttf/SDL_ttf.h>", "#include <SDL2/SDL_ttf.h>")
@@ -46,32 +41,6 @@ replace("src/lxp/lxplib.c", "lua_getref(L, xpu->tableref);  /* to be used by han
         "lua_rawgeti(L, LUA_REGISTRYINDEX, xpu->tableref);  /* to be used by handlers */")
 replace("src/lxp/lxplib.c", "static const struct luaL_reg lxp_meths[]", "static const luaL_Reg lxp_meths[]")
 replace("src/lxp/lxplib.c", "static const struct luaL_reg lxp_funcs[]", "static const luaL_Reg lxp_funcs[]")
-replace("src/lua/lstrlib.c", "static int str_format (lua_State *L) {",
-        "/* Match LuaJIT's %s conversion, which ToME uses during character creation. */\n"
-        "static const char *format_tostring (lua_State *L, int arg, size_t *len) {\n"
-        "  if (lua_type(L, arg) == LUA_TSTRING)\n"
-        "    return lua_tolstring(L, arg, len);\n"
-        "  if (luaL_callmeta(L, arg, \"__tostring\"))\n"
-        "    lua_replace(L, arg);\n"
-        "  switch (lua_type(L, arg)) {\n"
-        "    case LUA_TNUMBER: case LUA_TSTRING:\n"
-        "      return lua_tolstring(L, arg, len);\n"
-        "    case LUA_TNIL:\n"
-        "      lua_pushliteral(L, \"nil\");\n"
-        "      break;\n"
-        "    case LUA_TBOOLEAN:\n"
-        "      lua_pushstring(L, lua_toboolean(L, arg) ? \"true\" : \"false\");\n"
-        "      break;\n"
-        "    default:\n"
-        "      lua_pushfstring(L, \"%s: %p\", luaL_typename(L, arg), lua_topointer(L, arg));\n"
-        "      break;\n"
-        "  }\n"
-        "  lua_replace(L, arg);\n"
-        "  return lua_tolstring(L, arg, len);\n"
-        "}\n\n"
-        "static int str_format (lua_State *L) {")
-replace("src/lua/lstrlib.c", "        case 's': {\n          size_t l;\n          const char *s = luaL_checklstring(L, arg, &l);",
-        "        case 's': {\n          size_t l;\n          const char *s = format_tostring(L, arg, &l);")
 replace("src/zlib/zutil.h", "#if defined(MACOS) || defined(TARGET_OS_MAC)",
         "#if (defined(MACOS) || defined(TARGET_OS_MAC)) && !defined(__APPLE__)")
 replace("src/main.c", "\t\tif (os_autoflush) setlinebuf(logfile);", "\t\tif (logfile) setlinebuf(logfile);")
@@ -135,19 +104,14 @@ replace("bootstrap/boot.lua",
         "\t\t-- The native macOS core already returns Contents/Resources/.\n"
         "\t\tdir = dir")
 
-# Apply the Lua 5.1 fix while loading Entity, before subclasses copy its methods.
+# Install resolver ordering while loading Entity, before subclasses copy its methods.
 # Official engine/module/DLC archives stay byte-for-byte unchanged.
-if '\tif bname == "engine.Entity" and not jit then' in (SOURCE / "game/loader/init.lua").read_text():
-    replace("game/loader/init.lua", '\tif bname == "engine.Entity" and not jit then',
-            '\tif bname == "engine.Entity" then')
 replace("game/loader/init.lua", "\treturn prev\nend\n\ntable.insert(package.loaders, 2, te4_loader)",
         "\tif bname == \"engine.Entity\" then\n"
         "\t\tlocal original = prev\n"
         "\t\tprev = function(...)\n"
         "\t\t\tlocal result = original(...)\n"
-        "\t\t\tlocal install, err = loadfile(\"/loader/native-lua51.lua\")\n"
-        "\t\t\tassert(install, err)\n"
-        "\t\t\tinstall()(package.loaded[bname])\n"
+        "\t\t\tdofile(\"/loader/native-lua51.lua\")(package.loaded[bname])\n"
         "\t\t\treturn result\n"
         "\t\tend\n"
         "\tend\n"
@@ -158,18 +122,15 @@ replace("src/physfs.c", '#include "main.h"', '#include "main.h"\n#include "Nativ
 replace("src/physfs.c", '\tluaL_openlib(L, "fs", fslib, 0);',
         '\tluaL_openlib(L, "fs", fslib, 0);\n\tte4_native_lua_init(L);')
 
-if patches:
-    print("Applied native macOS patches.")
-if ORIGINALS.exists():
-    consolidated = []
-    for upstream in sorted(ORIGINALS.rglob("*")):
-        if not upstream.is_file() or upstream.name.startswith('.'):
-            continue
-        relative = upstream.relative_to(ORIGINALS)
-        consolidated.extend(difflib.unified_diff(
-            upstream.read_text().splitlines(True), (SOURCE / relative).read_text().splitlines(True),
-            fromfile=f"a/{relative}", tofile=f"b/{relative}"))
+consolidated = []
+for upstream in sorted(ORIGINALS.rglob("*")):
+    if not upstream.is_file() or upstream.name.startswith('.'):
+        continue
+    relative = upstream.relative_to(ORIGINALS)
     consolidated.extend(difflib.unified_diff(
-        [], (SOURCE / native_lua_relative).read_text().splitlines(True),
-        fromfile="/dev/null", tofile=f"b/{native_lua_relative}"))
-    (ROOT / "patches/native-arm64.patch").write_text("".join(consolidated))
+        upstream.read_text().splitlines(True), (SOURCE / relative).read_text().splitlines(True),
+        fromfile=f"a/{relative}", tofile=f"b/{relative}"))
+consolidated.extend(difflib.unified_diff(
+    [], (SOURCE / native_lua_relative).read_text().splitlines(True),
+    fromfile="/dev/null", tofile=f"b/{native_lua_relative}"))
+(ROOT / "patches/native-arm64.patch").write_text("".join(consolidated))

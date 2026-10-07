@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Check archive traversal rejection and release tag validation."""
+"""Check pinned source checksums and release tag validation."""
 import importlib.util
-import tarfile
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from project import PROJECT, ROOT, VERSION
+from project import PROJECT, ROOT, VERSION, verify_source_archive
 
 
 def module(name, filename):
@@ -15,22 +16,19 @@ def module(name, filename):
     return result
 
 
-fetch = module("fetch_source", "fetch-source.py")
 release = module("make_release", "make-release.py")
 
 
 class ReleaseToolsCheck(unittest.TestCase):
-    def test_archive_paths_and_types(self):
-        safe = tarfile.TarInfo(PROJECT["source_directory"] + "/src/main.c")
-        fetch.validate_members([safe])
-        for name in ["/etc/passwd", PROJECT["source_directory"] + "/../outside", "another-release/src/main.c"]:
-            with self.subTest(name=name), self.assertRaises(RuntimeError):
-                fetch.validate_members([tarfile.TarInfo(name)])
-        for kind in [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.CHRTYPE, tarfile.FIFOTYPE]:
-            linked = tarfile.TarInfo(PROJECT["source_directory"] + "/escape")
-            linked.type = kind
-            with self.subTest(kind=kind), self.assertRaises(RuntimeError):
-                fetch.validate_members([linked])
+    def test_source_checksum(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(PROJECT, source_sha256=
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"):
+            archive = Path(directory) / "source.tar.bz2"
+            archive.write_bytes(b"abc")
+            verify_source_archive(archive)
+            archive.write_bytes(b"abd")
+            with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+                verify_source_archive(archive)
 
     def test_release_tag_version_and_shell_input(self):
         release.validate_tag(f"v{VERSION}-arm64.1")

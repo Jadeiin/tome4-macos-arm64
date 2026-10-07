@@ -13,8 +13,6 @@ FRAMEWORKS = APP / "Contents/Frameworks"
 STAGING = APP / "Contents/Frameworks.new"
 LICENSES = APP / "Contents/Resources/ThirdPartyLicenses"
 SDL3 = Path("/opt/homebrew/opt/sdl3/lib/libSDL3.dylib").resolve()
-if not SDL3.exists():
-    raise SystemExit("Install the project Brewfile before packaging (SDL3 is required).")
 
 # Read the original link graph even when this helper is repeated on a bundled app.
 executable = (ROOT / "build/native/t-engine").resolve()
@@ -39,7 +37,7 @@ occupied = {}
 for binary, info in graph.items():
     if binary == executable:
         continue
-    name = Path(info["id"] or binary.name).name
+    name = Path(info["id"]).name
     if name in occupied and occupied[name] != binary:
         raise RuntimeError(f"Library filename collision: {name}")
     occupied[name] = binary
@@ -56,8 +54,6 @@ records = []
 for binary, name in names.items():
     destination = STAGING / name
     architectures = subprocess.check_output(["/usr/bin/lipo", "-archs", str(binary)], text=True).split()
-    if "arm64" not in architectures:
-        raise RuntimeError(f"Runtime library has no ARM64 slice: {binary}: {architectures}")
     if architectures == ["arm64"]:
         shutil.copy2(binary, destination)
     else:
@@ -100,10 +96,9 @@ for formula, prefix in sorted(formulae.items()):
         shutil.copy2(path, destination)
         copied.append(str(relative))
     formula_file = prefix / ".brew" / f"{formula}.rb"
-    if formula_file.exists():
-        destination = LICENSES / formula / "homebrew-formula.rb"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(formula_file, destination)
+    destination = LICENSES / formula / "homebrew-formula.rb"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(formula_file, destination)
     license_records.append({"formula": formula, "version": prefix.name, "license_files": copied})
 
 if FRAMEWORKS.exists():

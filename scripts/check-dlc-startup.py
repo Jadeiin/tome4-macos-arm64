@@ -12,16 +12,13 @@ from project import APP, LOGS, ROOT
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--seconds", type=int, default=30)
 args = parser.parse_args()
-if args.seconds < 10:
-    parser.error("Allow at least 10 seconds for the module to load.")
 
 stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 home = ROOT / "build" / f"runtime-dlc-{stamp}"
 settings = home / "Library/Application Support/T-Engine/4.0/settings"
 settings.mkdir(parents=True, exist_ok=True)
 (settings / "disable_all_connectivity.cfg").write_text("disable_all_connectivity = true\n")
-logs = ROOT / "logs"
-logs.mkdir(exist_ok=True)
+logs = LOGS
 system_log = Path("/tmp/te4_log.txt")
 old_stat = system_log.stat() if system_log.exists() else None
 command = [str(APP / "Contents/MacOS/t-engine"), "--home", str(home),

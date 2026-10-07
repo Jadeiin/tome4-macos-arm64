@@ -3,7 +3,6 @@
 import argparse
 import json
 import plistlib
-import platform
 import shutil
 import subprocess
 import sys
@@ -50,7 +49,7 @@ with (CONTENTS / "Info.plist").open("wb") as output:
 subprocess.run([sys.executable, str(ROOT / "scripts/bundle-runtime.py")], check=True)
 runtime = json.loads((RESOURCES / "runtime-libraries.json").read_text())
 versions = [config["deployment"]] + [record["minimum_macos"] for record in runtime["runtime_libraries"]
-                                    if record.get("minimum_macos")]
+                                    if record["minimum_macos"]]
 info["LSMinimumSystemVersion"] = max(versions, key=lambda value: tuple(int(part) for part in value.split('.')))
 with (CONTENTS / "Info.plist").open("wb") as output:
     plistlib.dump(info, output)

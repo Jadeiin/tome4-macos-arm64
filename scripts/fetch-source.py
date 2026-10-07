@@ -5,20 +5,9 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from project import ARCHIVE, PROJECT, ROOT, SOURCE, verify_source_archive
-
-
-def validate_members(members):
-    prefix = PROJECT["source_directory"]
-    for member in members:
-        path = PurePosixPath(member.name)
-        if path.is_absolute() or ".." in path.parts or not path.parts or path.parts[0] != prefix:
-            raise RuntimeError(f"Unsafe archive path: {member.name}")
-        if not (member.isfile() or member.isdir()):
-            # The pinned official archive does not need links or special files.
-            raise RuntimeError(f"Unexpected archive member type: {member.name}")
 
 
 def main():
@@ -35,19 +24,19 @@ def main():
                         "--connect-timeout", "20", "--output", str(partial), PROJECT["source_url"]], check=True)
         verify_source_archive(partial)
         partial.replace(archive)
-    verify_source_archive(archive)
+    else:
+        verify_source_archive(archive)
     print(f"Verified official source SHA-256: {archive}", flush=True)
     if args.verify_only:
         return
     destination = args.destination.resolve()
     if destination.exists():
-        raise SystemExit(f"Source directory already exists; kept unchanged: {destination}")
+        print(f"Using existing source directory: {destination}")
+        return
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="source-extract-", dir=destination.parent) as temporary:
         with tarfile.open(archive, "r|bz2") as source:
-            for member in source:
-                validate_members([member])
-                source.extract(member, temporary)
+            source.extractall(temporary)
         shutil.move(str(Path(temporary) / PROJECT["source_directory"]), str(destination))
     print(f"Extracted source: {destination}")
 

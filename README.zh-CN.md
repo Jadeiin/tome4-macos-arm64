@@ -114,7 +114,7 @@ git push origin v1.7.6-arm64.3
 /usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.3
 ```
 
-输出位于 `dist/release/`。再次打包前需保留或移走已有发布文件。
+输出位于 `dist/release/`。重新构建同一版本时会覆盖该版本的生成文件。
 普通本机构建保留导入的 DLC；公开 DMG 打包会拒绝包含 DLC 文件的应用。
 
 ## 导入已购买的 DLC
@@ -124,7 +124,7 @@ git push origin v1.7.6-arm64.3
 /usr/bin/python3 scripts/package-native.py
 ```
 
-DLC 文件来自用户自己的 Steam 安装，仅在本机复制和校验。职业和种族解锁仍遵循游戏规则。
+DLC 压缩档案来自用户自己的 Steam 安装，检查完整性后在本机复制。职业和种族解锁仍遵循游戏规则。
 
 ## 来源与许可
 

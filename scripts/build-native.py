@@ -15,16 +15,9 @@ PACKAGES = ["sdl2", "SDL2_image", "SDL2_ttf", "vorbisfile", "libpng", "openal", 
 
 if platform.machine() != "arm64":
     sys.exit("Run this script from an ARM64 terminal. Rosetta is not supported.")
-if not PKG_CONFIG.exists():
-    sys.exit("Install Homebrew dependencies listed in README.md first.")
-openal_pc = Path("/opt/homebrew/opt/openal-soft/lib/pkgconfig/openal.pc")
-if not openal_pc.exists():
-    sys.exit("Install the ARM64 audio dependency: /opt/homebrew/bin/brew install openal-soft")
-if not Path("/opt/homebrew/opt/luajit/lib/pkgconfig/luajit.pc").exists():
-    sys.exit("Install the ARM64 Lua runtime: /opt/homebrew/bin/brew install luajit")
 # Homebrew keeps OpenAL Soft keg-only because macOS supplies OpenAL.framework.
 pkg_environment = dict(os.environ)
-pkg_environment["PKG_CONFIG_PATH"] = str(openal_pc.parent) + os.pathsep + os.environ.get("PKG_CONFIG_PATH", "")
+pkg_environment["PKG_CONFIG_PATH"] = "/opt/homebrew/opt/openal-soft/lib/pkgconfig" + os.pathsep + os.environ.get("PKG_CONFIG_PATH", "")
 subprocess.run([sys.executable, str(ROOT / "scripts/patch-native.py")], check=True)
 BUILD.mkdir(parents=True, exist_ok=True)
 sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()

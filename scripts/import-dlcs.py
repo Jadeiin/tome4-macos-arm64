@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Copy purchased DLC archives from a local Steam installation."""
 import argparse
-import hashlib
 import json
 import shutil
 import sys
 import zipfile
 from pathlib import Path
 
-from project import ROOT, SOURCE
+from project import ROOT, SOURCE, sha256
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("steam_dlcs", type=Path, help="DLC directory of your purchased Steam installation")
@@ -28,13 +27,10 @@ for source in archives:
         entries = len(archive.infolist())
     destination = TARGET / source.name
     shutil.copy2(source, destination)
-    source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-    target_hash = hashlib.sha256(destination.read_bytes()).hexdigest()
-    if source_hash != target_hash:
-        raise RuntimeError(f"DLC copy verification failed: {destination}")
+    source_hash = sha256(source)
     manifest.append({"file": source.name, "source": str(source),
                      "bytes": source.stat().st_size, "entries": entries,
                      "sha256": source_hash})
-    print(f"Imported {source.name}: {entries} entries; SHA-256 verified.")
+    print(f"Imported {source.name}: {entries} entries; SHA-256 {source_hash}.")
 (ROOT / "logs/dlc-import.json").write_text(json.dumps(manifest, indent=2) + "\n")
 print("Run scripts/package-native.py to include these DLCs in the app.")

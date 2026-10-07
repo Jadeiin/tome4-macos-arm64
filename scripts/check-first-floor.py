@@ -16,8 +16,6 @@ parser.add_argument("--seconds", type=int, default=120, help="Maximum test runti
 parser.add_argument("--talents", action="store_true", help="Also cancel and complete real Shield Pummel targeting")
 parser.add_argument("--require-dlcs", action="store_true", help="Also require both paid DLCs to load")
 args = parser.parse_args()
-if args.seconds < 10:
-    parser.error("Allow at least 10 seconds for game startup.")
 dlc_names = {"ashes-urhrok": "ashes-urhrok.teaac", "orcs": "orcs.teaac"}
 expected_dlcs = [name for name, archive in dlc_names.items()
                  if args.require_dlcs or (APP / "Contents/Resources/game/dlcs" / archive).is_file()]
@@ -155,7 +153,7 @@ with zipfile.ZipFile(addons / "tome-native-floor-check.teaa", "w", zipfile.ZIP_D
     archive.writestr("init.lua", init)
     archive.writestr("superload/mod/dialogs/Birther.lua", birther)
     archive.writestr("superload/mod/class/Game.lua", game)
-logs = ROOT / "logs"
+logs = LOGS
 system_log = Path("/tmp/te4_log.txt")
 old_stat = system_log.stat() if system_log.exists() else None
 command = [str(APP / "Contents/MacOS/t-engine"), "--home", str(home),
