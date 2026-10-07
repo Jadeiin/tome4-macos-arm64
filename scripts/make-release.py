@@ -47,7 +47,8 @@ def main():
         raise RuntimeError("Public DMGs must use package-native.py --without-dlcs.")
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(APP)], check=True)
     with (APP / "Contents/Info.plist").open("rb") as stream:
-        minimum_macos = plistlib.load(stream)["LSMinimumSystemVersion"]
+        info = plistlib.load(stream)
+    minimum_macos = info["LSMinimumSystemVersion"]
     directory = ROOT / "dist/release"
     directory.mkdir(parents=True, exist_ok=True)
     stem = f"Tales-of-MajEyal-{build_id.removeprefix('v')}"
@@ -70,6 +71,7 @@ def main():
     runtime = json.loads((APP / "Contents/Resources/runtime-libraries.json").read_text())
     manifest = {"version": VERSION, "build_id": build_id, "commit": commit,
                 "architecture": "arm64", "minimum_macos": minimum_macos,
+                "bundle_build_version": info["CFBundleVersion"],
                 "runtime_requires_homebrew": False, "paid_dlcs_included": False,
                 "signing": "ad hoc; not notarized", "upstream": PROJECT,
                 "runtime_libraries": runtime}
@@ -81,6 +83,7 @@ def main():
         f"Native Apple Silicon build of Tales of Maj'Eyal {VERSION}.\n\n"
         f"- Requires macOS **{minimum_macos}+**; ARM64 only.\n"
         "- Bundled LuaJIT 2.1, SDL and OpenAL Soft; no Homebrew or Rosetta needed.\n"
+        "- Native macOS fullscreen Space with Retina rendering and Game Mode support.\n"
         "- Includes a DMG, corresponding project sources with the verified official source archive, and SHA-256 checksums.\n"
         "- CI verifies native links/signatures, relocated library loading, Lua compatibility, first-floor generation and skill targeting.\n"
         "- Paid DLCs are excluded. Signing is ad hoc; this build is not notarized.\n\n"

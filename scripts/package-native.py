@@ -12,6 +12,7 @@ from project import APP, PROJECT, ROOT, SOURCE, VERSION
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--without-dlcs", action="store_true", help="Exclude local DLCs for public builds")
+parser.add_argument("--build-version", default="4", help="macOS bundle build number (default: 4)")
 args = parser.parse_args()
 CONTENTS = APP / "Contents"
 RESOURCES = CONTENTS / "Resources"
@@ -37,14 +38,14 @@ info = {
     "CFBundleIdentifier": "org.te4.tome.native",
     "CFBundlePackageType": "APPL",
     "CFBundleShortVersionString": VERSION,
-    "CFBundleVersion": VERSION,
+    "CFBundleVersion": args.build_version,
     "CFBundleIconFile": "te4.icns",
     "LSMinimumSystemVersion": config["deployment"],
     "LSArchitecturePriority": ["arm64"],
     "NSHighResolutionCapable": True,
+    "LSApplicationCategoryType": "public.app-category.role-playing-games",
+    "LSSupportsGameMode": True,
 }
-with (CONTENTS / "Info.plist").open("wb") as output:
-    plistlib.dump(info, output)
 (CONTENTS / "PkgInfo").write_bytes(b"APPL????")
 subprocess.run([sys.executable, str(ROOT / "scripts/bundle-runtime.py")], check=True)
 runtime = json.loads((RESOURCES / "runtime-libraries.json").read_text())
@@ -56,4 +57,5 @@ with (CONTENTS / "Info.plist").open("wb") as output:
 (RESOURCES / "upstream-source.json").write_text(json.dumps(PROJECT, indent=2) + "\n")
 subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(APP)], check=True)
 subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", str(APP)], check=True)
+APP.touch()
 print(APP)

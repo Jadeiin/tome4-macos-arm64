@@ -53,7 +53,7 @@ jobs:
 
       - name: Package app with its runtime libraries
         run: |
-          /usr/bin/python3 scripts/package-native.py --without-dlcs
+          /usr/bin/python3 scripts/package-native.py --without-dlcs --build-version "${{ github.run_number }}"
           /usr/bin/python3 scripts/verify-native.py
           /usr/bin/python3 scripts/check-bundled-runtime.py
 

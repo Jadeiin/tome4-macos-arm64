@@ -1,4 +1,7 @@
-# macOS fullscreen application switching
+# macOS exclusive fullscreen switching — historical investigation
+
+Release `v1.7.6-arm64.3` used the fix described here. The current build uses
+[native fullscreen Spaces](macos-native-fullscreen.md).
 
 ## Report and reproduction
 
@@ -13,7 +16,7 @@ the game, the next Command-Tab changed the foreground application to Finder,
 but the game stayed above Finder at window level 25. The first switch away
 had hidden the game successfully.
 
-## Cause in the current build
+## Cause in the exclusive fullscreen build
 
 The engine requests SDL exclusive fullscreen. On macOS this changes the
 display mode and raises the window above ordinary application windows.
@@ -31,7 +34,7 @@ They do not establish which SDL version caused the original forum report.
 
 ## Fix
 
-`scripts/NativeMain.m` handles application activation notifications:
+The previous `scripts/NativeMain.m` handled application activation notifications:
 
 - On application deactivation, leave exclusive fullscreen and minimize the window.
 - On application activation, restore the window and re-enter exclusive fullscreen.

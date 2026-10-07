@@ -1,0 +1,94 @@
+# Native macOS fullscreen
+
+The default native ToME 1.7.6 build uses a fullscreen Space, Retina rendering
+and Game Mode support. Tested on Apple Silicon with macOS 27.0.1,
+sdl2-compat 2.32.74 and SDL3 3.4.18 on October 7, 2026.
+
+Release `v1.7.6-arm64.3` used the previous
+[exclusive fullscreen workaround](macos-fullscreen.md).
+
+## Implementation
+
+- `scripts/NativeMain.m` enables `SDL_VIDEO_MAC_FULLSCREEN_SPACES` and
+  `SDL_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY` before window creation.
+- `patches/native-arm64.patch` requests `SDL_WINDOW_FULLSCREEN_DESKTOP` and
+  `SDL_WINDOW_ALLOW_HIGHDPI`. App switching keeps the window fullscreen at Cocoa
+  window level 0 and leaves the monitor's display mode unchanged.
+- Native resize events read the actual window and drawable dimensions. Duplicate
+  events skip buffer allocation and UI rebuilding when size and fullscreen state
+  are unchanged. Moving the saved window position keeps the native Space open.
+- `scripts/native-display.lua` offers one fullscreen item and the game's window
+  sizes that fit the current display's usable bounds in logical points.
+
+The loader installs the Lua override. Official engine, game and DLC archives
+remain unchanged. The old minimize/restore activation observers and synthetic
+fullscreen resize event have been removed.
+
+## Retina coordinates
+
+OpenGL renders in drawable pixels; SDL window sizes and mouse events use logical
+points. The engine converts between these coordinate systems for rendering,
+mouse events, cursor polling, warping and screenshots.
+
+| Quantity | Fullscreen | Windowed |
+| --- | --- | --- |
+| Window size in points | 1920 × 1080 | 1600 × 900 |
+| Drawable and viewport in pixels | 3840 × 2160 | 3200 × 1800 |
+| Screen Zoom | 200% | 200% |
+| Game UI size | 1920 × 1080 | 1600 × 900 |
+
+Windowed settings save logical dimensions, so reopening a window preserves its
+size. Fullscreen settings record actual drawable dimensions. Screen Zoom still
+scales framebuffer pixels; 200% gives the usual UI size on a 2× Retina display.
+
+## Game Mode metadata
+
+The packager writes Apple's documented declarations:
+
+```xml
+<key>LSApplicationCategoryType</key>
+<string>public.app-category.role-playing-games</string>
+<key>LSSupportsGameMode</key>
+<true/>
+```
+
+The category identifies ToME as a role-playing game. Native fullscreen comes from
+SDL. Game Mode requires Apple Silicon and supported macOS; `LSSupportsGameMode`
+is documented for macOS 26 and later.
+
+Tests found stale app metadata: correct plist keys alone did not activate Game
+Mode in a previously registered bundle. A fresh bundle worked, as did updating
+the old bundle's build version and modification time and registering it again.
+The exact cache responsible was not identified.
+
+`--build-version` supplies a numeric `CFBundleVersion` independently of the
+upstream game version. CI uses its workflow run number. Packaging refreshes the
+bundle's modification time; local development can also refresh registration with
+`lsregister -f`. No extra Cocoa event loop or private Game Mode API is needed.
+
+## Validation
+
+Tests use isolated profiles and close their own game processes.
+
+- Three actual Command-Tab away/return cycles preserved fullscreen, visible
+  application order, and the desktop's logical and physical display modes.
+- The game menu and Cocoa fullscreen control both preserved drawable and UI
+  sizes. Actual keyboard selection changed to the requested window size.
+- Escape closed a dialog while keeping fullscreen. A posted mouse click and
+  cursor warp both mapped to game coordinate `(600, 400)`.
+- Game Mode activation was checked through system state and the Game Overlay.
+- The first floor, 100 inscriptions, Shield Pummel cancellation/completion,
+  ARM64 LuaJIT, OpenAL Soft and all three DLC packs passed. The production app's
+  first floor generated in 1027 ms.
+- Official-source patch application, repeat application, ARM64 architecture,
+  signatures and relocated loading of all 34 libraries passed.
+
+Local evidence is in `logs/native-fullscreen-*` and `logs/luajit-gameplay-*`.
+Multiple displays and earlier macOS versions need separate validation.
+
+## References
+
+- [SDL: macOS fullscreen Spaces](https://wiki.libsdl.org/SDL2/SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES)
+- [Apple: LSApplicationCategoryType](https://developer.apple.com/documentation/bundleresources/information-property-list/lsapplicationcategorytype)
+- [Apple: LSSupportsGameMode](https://developer.apple.com/documentation/bundleresources/information-property-list/lssupportsgamemode)
+- [Apple: Use Game Mode](https://support.apple.com/en-us/105118)

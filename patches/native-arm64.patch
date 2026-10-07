@@ -12,21 +12,34 @@
  
 --- a/game/loader/init.lua
 +++ b/game/loader/init.lua
-@@ -182,6 +182,14 @@
- 			prev = apply_superloads(prev, __addons_fn_superloads[addon][bname])
- 		end
+@@ -144,6 +144,11 @@
  	end
-+	if bname == "engine.Entity" then
+ end
+ 
++local native_overrides = {
++	["engine.Entity"] = "/loader/native-lua51.lua",
++	["engine.dialogs.DisplayResolution"] = "/loader/native-display.lua",
++}
++
+ local te4_loader = function(name)
+ 	local bname = name
+ 
+@@ -180,6 +185,15 @@
+ 		if __addons_fn_superloads[addon] and __addons_fn_superloads[addon][bname] then
+ 			print("FUNCTIONS FOUND", addon, bname)
+ 			prev = apply_superloads(prev, __addons_fn_superloads[addon][bname])
++		end
++	end
++	local native = native_overrides[bname]
++	if native then
 +		local original = prev
 +		prev = function(...)
 +			local result = original(...)
-+			dofile("/loader/native-lua51.lua")(package.loaded[bname])
++			dofile(native)(package.loaded[bname])
 +			return result
-+		end
-+	end
+ 		end
+ 	end
  	return prev
- end
- 
 --- a/src/core_lua.c
 +++ b/src/core_lua.c
 @@ -40,7 +40,7 @@
@@ -38,6 +51,67 @@
  #else
  #include <png.h>
  #endif
+@@ -329,8 +329,8 @@
+ 	int x = 0, y = 0;
+ 	int buttons = SDL_GetMouseState(&x, &y);
+ 
+-	lua_pushnumber(L, x / screen_zoom);
+-	lua_pushnumber(L, y / screen_zoom);
++	lua_pushnumber(L, x * window_scale / screen_zoom);
++	lua_pushnumber(L, y * window_scale / screen_zoom);
+ 	lua_pushnumber(L, SDL_BUTTON(buttons));
+ 
+ 	return 3;
+@@ -339,7 +339,7 @@
+ {
+ 	int x = luaL_checknumber(L, 1);
+ 	int y = luaL_checknumber(L, 2);
+-	SDL_WarpMouseInWindow(window, x * screen_zoom, y * screen_zoom);
++	SDL_WarpMouseInWindow(window, x * screen_zoom / window_scale, y * screen_zoom / window_scale);
+ 	return 0;
+ }
+ extern int current_mousehandler;
+@@ -678,9 +678,21 @@
+ 	lua_pushnumber(L, screen->h / screen_zoom);
+ 	lua_pushboolean(L, is_fullscreen);
+ 	lua_pushboolean(L, is_borderless);
+-	lua_pushnumber(L, screen->w);
+-	lua_pushnumber(L, screen->h);
++	int width, height;
++	SDL_GetWindowSize(window, &width, &height);
++	lua_pushnumber(L, is_fullscreen ? screen->w : width);
++	lua_pushnumber(L, is_fullscreen ? screen->h : height);
+ 	return 6;
++}
++
++static int sdl_usable_size(lua_State *L)
++{
++	SDL_Rect bounds;
++	if (SDL_GetDisplayUsableBounds(SDL_GetWindowDisplayIndex(window), &bounds) != 0)
++		return luaL_error(L, "%s", SDL_GetError());
++	lua_pushinteger(L, bounds.w);
++	lua_pushinteger(L, bounds.h);
++	return 2;
+ }
+ 
+ static int sdl_window_pos(lua_State *L)
+@@ -3142,7 +3154,7 @@
+ 	png_bytep *row_pointers;
+ 	int aw, ah;
+ 
+-	SDL_GetWindowSize(window, &aw, &ah);
++	SDL_GL_GetDrawableSize(window, &aw, &ah);
+ 
+ 	/* Y coordinate must be reversed for OpenGL. */
+ 	y = ah - (y + height);
+@@ -3508,6 +3520,7 @@
+ 	{"forceRedrawForScreenshot", sdl_redraw_screen_for_screenshot},
+ 	{"redrawingForSavefileScreenshot", redrawing_for_savefile_screenshot},
+ 	{"size", sdl_screen_size},
++	{"usableSize", sdl_usable_size},
+ 	{"windowPos", sdl_window_pos},
+ 	{"newFont", sdl_new_font},
+ 	{"newSurface", sdl_new_surface},
 --- a/src/getself.c
 +++ b/src/getself.c
 @@ -19,6 +19,8 @@
@@ -135,25 +209,123 @@
  };
 --- a/src/main.c
 +++ b/src/main.c
-@@ -1068,6 +1068,17 @@
+@@ -68,6 +68,7 @@
+ int g_argc = 0;
+ char **g_argv;
+ float screen_zoom = 1;
++float window_scale = 1;
+ SDL_Window *window = NULL;
+ SDL_Surface *windowIconSurface = NULL;
+ SDL_GLContext maincontext; /* Our opengl context handle */
+@@ -440,8 +441,8 @@
+ 				lua_concat(L, 2);
+ 				break;
+ 			}
+-			lua_pushnumber(L, event->button.x / screen_zoom);
+-			lua_pushnumber(L, event->button.y / screen_zoom);
++			lua_pushnumber(L, event->button.x * window_scale / screen_zoom);
++			lua_pushnumber(L, event->button.y * window_scale / screen_zoom);
+ 			lua_pushboolean(L, (event->type == SDL_MOUSEBUTTONUP) ? TRUE : FALSE);
+ 			docall(L, 5, 0);
+ 		}
+@@ -465,16 +466,16 @@
+ 				else if (event->wheel.x > 0) lua_pushstring(L, "wheelleft");
+ 				else if (event->wheel.x < 0) lua_pushstring(L, "wheelright");
+ 				else lua_pushstring(L, "wheelnone");
+-				lua_pushnumber(L, x / screen_zoom);
+-				lua_pushnumber(L, y / screen_zoom);
++				lua_pushnumber(L, x * window_scale / screen_zoom);
++				lua_pushnumber(L, y * window_scale / screen_zoom);
+ 				lua_pushboolean(L, i);
+ 				docall(L, 5, 0);
+ 			}
+ 		}
+ 		return TRUE;
+ 	case SDL_MOUSEMOTION:
+-		mousex = event->motion.x / screen_zoom;
+-		mousey = event->motion.y / screen_zoom;
++		mousex = event->motion.x * window_scale / screen_zoom;
++		mousey = event->motion.y * window_scale / screen_zoom;
  
- }
+ 		if (current_mousehandler != LUA_NOREF)
+ 		{
+@@ -489,10 +490,10 @@
+ 			else if (event->motion.state & SDL_BUTTON(4)) lua_pushstring(L, "wheelup");
+ 			else if (event->motion.state & SDL_BUTTON(5)) lua_pushstring(L, "wheeldown");
+ 			else lua_pushstring(L, "none");
+-			lua_pushnumber(L, event->motion.x / screen_zoom);
+-			lua_pushnumber(L, event->motion.y / screen_zoom);
+-			lua_pushnumber(L, event->motion.xrel);
+-			lua_pushnumber(L, event->motion.yrel);
++			lua_pushnumber(L, event->motion.x * window_scale / screen_zoom);
++			lua_pushnumber(L, event->motion.y * window_scale / screen_zoom);
++			lua_pushnumber(L, event->motion.xrel * window_scale / screen_zoom);
++			lua_pushnumber(L, event->motion.yrel * window_scale / screen_zoom);
+ 			docall(L, 6, 0);
+ 		}
+ 		return TRUE;
+@@ -1041,41 +1042,33 @@
+ 		h = start_ypos;
+ 	}
  
-+/* OpenGL windows cannot also have an SDL software window surface.
-+ * The legacy screen object is only used for dimensions and pixel format. */
-+static void updateScreenInfo(void)
-+{
-+	int width, height;
-+	SDL_GetWindowSize(window, &width, &height);
-+	SDL_FreeSurface(screen);
-+	screen = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
-+	if (!screen) { fprintf(stderr, "Screen allocation failed: %s\n", SDL_GetError()); exit(1); }
+-	/* Can't move a fullscreen SDL window in one go.*/
+-	if (is_fullscreen) {
+-		/* Drop out of fullscreen so we can move the window. */
+-		SDL_SetWindowFullscreen(window, SDL_FALSE);
+-
+-	}
+-
+-	/* Move the window */
++	/* SDL keeps the windowed position while its native Space is fullscreen. */
+ 	SDL_SetWindowPosition(window, w, h);
+ 
+-	/* Jump back into fullscreen if necessary */
+-	if (is_fullscreen) {
+-		if (!SDL_SetWindowFullscreen(window, SDL_TRUE)) {
+-			/* Fullscreen change successful */
+-			is_fullscreen = SDL_TRUE;
+-
+-		} else {
+-			/* Error switching fullscreen mode */
+-			printf("[DO MOVE] Unable to return window"
+-					" to fullscreen mode:  %s\n", SDL_GetError());
+-			SDL_ClearError();
+-		}
+-
+-	}
+-
 +}
 +
++/* OpenGL windows cannot also have an SDL software window surface.
++ * The legacy screen object is only used for dimensions and pixel format. */
++static bool updateScreenInfo(void)
++{
++	int width, height, points_width;
++	SDL_GL_GetDrawableSize(window, &width, &height);
++	SDL_GetWindowSize(window, &points_width, NULL);
++	float scale = (float)width / points_width;
++	bool changed = !screen || screen->w != width || screen->h != height || window_scale != scale;
++	window_scale = scale;
++	if (!screen || screen->w != width || screen->h != height) {
++		SDL_FreeSurface(screen);
++		screen = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
++		if (!screen) { fprintf(stderr, "Screen allocation failed: %s\n", SDL_GetError()); exit(1); }
++	}
++	return changed;
+ }
+ 
  /* @see main.h#do_resize */
  void do_resize(int w, int h, bool fullscreen, bool borderless, float zoom)
  {
-@@ -1088,6 +1099,7 @@
+-	/* Temporary width, height (since SDL might reject our resize) */
+-	int aw, ah;
+-	int mustPushEvent = 0;
+ 	int mustCreateIconSurface = 0;
+-	SDL_Event fsEvent;
+ 
+ 	screen_zoom = zoom;
+ 
+@@ -1088,6 +1081,7 @@
  		SDL_DestroyWindow(window);
  		maincontext = 0;
  		window = 0;
@@ -161,12 +333,23 @@
  		screen = 0;
  		/* Clean up the old window icon */
  		SDL_FreeSurface(windowIconSurface);
-@@ -1112,10 +1124,17 @@
+@@ -1101,9 +1095,9 @@
+ 		window = SDL_CreateWindow("TE4",
+ 				(start_xpos == -1) ? SDL_WINDOWPOS_CENTERED : start_xpos,
+ 				(start_ypos == -1) ? SDL_WINDOWPOS_CENTERED : start_ypos, w, h,
+-				SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL
++				SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI
+ 				| (!borderless ? SDL_WINDOW_RESIZABLE : 0)
+-				| (fullscreen ? SDL_WINDOW_FULLSCREEN : 0)
++				| (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
+ 				| (borderless ? SDL_WINDOW_BORDERLESS : 0)
+ 		);
+ 		if (window==NULL) {
+@@ -1112,10 +1106,17 @@
  		}
  		is_fullscreen = fullscreen;
  		is_borderless = borderless;
 -		screen = SDL_GetWindowSurface(window);
-+		updateScreenInfo();
  		maincontext = SDL_GL_CreateContext(window);
 -		SDL_GL_MakeCurrent(window, maincontext);
 -		glewInit();
@@ -174,6 +357,7 @@
 +			fprintf(stderr, "OpenGL context creation failed: %s\n", SDL_GetError());
 +			exit(1);
 +		}
++		updateScreenInfo();
 +		GLenum glew_status = glewInit();
 +		if (glew_status != GLEW_OK) {
 +			fprintf(stderr, "GLEW initialization failed: %s\n", glewGetErrorString(glew_status));
@@ -182,7 +366,58 @@
  
  		/* Set the window icon. */
  		windowIconSurface = IMG_Load_RW(PHYSFSRWOPS_openRead(WINDOW_ICON_PATH)
-@@ -1178,7 +1197,7 @@
+@@ -1129,21 +1130,20 @@
+ 		}
+ 	} else {
+ 
+-		/* SDL won't allow a fullscreen resolution change in one go.  Check. */
+-		if (is_fullscreen) {
+-			/* Drop out of fullscreen so we can change resolution. */
++		/* Native fullscreen keeps the desktop display mode. */
++		if (is_fullscreen && !fullscreen) {
++			/* Leave the native Space when returning to a window. */
+ 			SDL_SetWindowFullscreen(window, SDL_FALSE);
+ 			is_fullscreen = 0;
+-			mustPushEvent = 1; /* Actually just a maybe for now, confirmed later */
+ 
+ 		}
+ 
+ 		/* Update window size */
+-		SDL_SetWindowSize(window, w, h);
++		if (!fullscreen) SDL_SetWindowSize(window, w, h);
+ 
+ 		/* Jump [back] into fullscreen if requested */
+ 		if (fullscreen) {
+-			if (!SDL_SetWindowFullscreen(window, SDL_TRUE)) {
++			if (!SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP)) {
+ 				/* Fullscreen change successful */
+ 				is_fullscreen = SDL_TRUE;
+ 
+@@ -1154,39 +1154,17 @@
+ 				SDL_ClearError();
+ 			}
+ 
+-		} else if (mustPushEvent) {
+-			/* Handle fullscreen -> nonfullscreen transition */
+-			/*
+-			 * Our changes will get clobbered by an automatic event from
+-			 * setWindowFullscreen.  Push an event to the event loop to make
+-			 * sure these changes are applied after whatever that other
+-			 * event throws.
+-			 */
+-			/* Create an event to push */
+-			fsEvent.type = SDL_WINDOWEVENT;
+-			fsEvent.window.timestamp = SDL_GetTicks();
+-			fsEvent.window.windowID = SDL_GetWindowID(window);
+-			// windowId
+-			fsEvent.window.event = SDL_WINDOWEVENT_RESIZED;
+-			fsEvent.window.data1 = w;
+-			fsEvent.window.data2 = h;
+-
+-			/* Push the event, but don't bother waiting */
+-			SDL_PushEvent(&fsEvent);
+-			printf("[DO RESIZE]: pushed fullscreen compensation event\n");
+-
  		}
  
  		/* Finally, update the screen info */
@@ -191,7 +426,17 @@
  
  	}
  
-@@ -1490,7 +1509,7 @@
+ 	/* Check and see if SDL honored our resize request */
+-	SDL_GetWindowSize(window, &aw, &ah);
+-	printf("[DO RESIZE] Got: %dx%d (%d, %d)\n", aw, ah, is_fullscreen, borderless);
++	printf("[DO RESIZE] Got: %dx%d (%d, %d)\n", screen->w, screen->h, is_fullscreen, borderless);
+ 	SDL_GL_MakeCurrent(window, maincontext);
+-	resizeWindow(aw, ah);
++	resizeWindow(screen->w, screen->h);
+ 
+ }
+ 
+@@ -1490,7 +1468,7 @@
  	if (!is_zygote) {
  		const char *logname = "/tmp/te4_log.txt";
  		logfile = freopen(logname, "w", stdout);
@@ -200,13 +445,72 @@
  	}
  #endif
  
-@@ -1772,4 +1791,5 @@
+@@ -1552,7 +1530,7 @@
+ 	TTF_Init();
+ 
+ 	/* Sets up OpenGL double buffering */
+-	resizeWindow(WIDTH, HEIGHT);
++	resizeWindow(screen->w, screen->h);
+ 
+ 	// Allow screensaver to work
+ 	SDL_EnableScreenSaver();
+@@ -1601,24 +1579,23 @@
+ 				switch (event.window.event)
+ 				{
+ 				case SDL_WINDOWEVENT_RESIZED:
+-					/* Note: SDL can't resize a fullscreen window, so don't bother! */
+-					if (!is_fullscreen) {
+-						printf("SDL_WINDOWEVENT_RESIZED: %d x %d\n", event.window.data1, event.window.data2);
+-						do_resize(event.window.data1, event.window.data2, is_fullscreen, is_borderless, screen_zoom);
+-						if (current_game != LUA_NOREF)
+-						{
+-							lua_rawgeti(L, LUA_REGISTRYINDEX, current_game);
+-							lua_pushstring(L, "onResolutionChange");
+-							lua_gettable(L, -2);
+-							lua_remove(L, -2);
+-							lua_rawgeti(L, LUA_REGISTRYINDEX, current_game);
+-							docall(L, 1, 0);
+-						}
+-					} else {
+-						printf("SDL_WINDOWEVENT_RESIZED: ignored due to fullscreen\n");
+-
++				case SDL_WINDOWEVENT_SIZE_CHANGED: {
++					bool fullscreen = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
++					bool fullscreen_changed = fullscreen != is_fullscreen;
++					is_fullscreen = fullscreen;
++					/* SDL can report both events for the same native resize. */
++					if (!updateScreenInfo() && !fullscreen_changed) break;
++					resizeWindow(screen->w, screen->h);
++					if (current_game != LUA_NOREF) {
++						lua_rawgeti(L, LUA_REGISTRYINDEX, current_game);
++						lua_pushstring(L, "onResolutionChange");
++						lua_gettable(L, -2);
++						lua_remove(L, -2);
++						lua_rawgeti(L, LUA_REGISTRYINDEX, current_game);
++						docall(L, 1, 0);
+ 					}
+ 					break;
++				}
+ 				case SDL_WINDOWEVENT_MOVED: {
+ 					int x, y;
+ 					/* Note: SDL can't resize a fullscreen window, so don't bother! */
+@@ -1772,4 +1749,5 @@
  #ifdef SELFEXE_MACOSX
  	fclose(stdout);
  #endif
 -}
 +	return 0;
 +}
+--- a/src/main.h
++++ b/src/main.h
+@@ -79,6 +79,7 @@
+ extern char **g_argv;
+ extern char *override_home;
+ extern float screen_zoom;
++extern float window_scale;
+ extern bool forbid_idle_mode;
+ 
+ /* Error handling */
 --- a/src/music.c
 +++ b/src/music.c
 @@ -121,6 +121,8 @@
@@ -241,6 +545,24 @@
  #include "core_lua.h"
  #include <setjmp.h>
  #include "particles.h"
+--- a/src/physfs.c
++++ b/src/physfs.c
+@@ -30,6 +30,7 @@
+ #include "zlib.h"
+ #include "types.h"
+ #include "main.h"
++#include "NativeLua.h"
+ 
+ /******************************************************************
+  ******************************************************************
+@@ -635,6 +636,7 @@
+ 	auxiliar_newclass(L, "physfs{file}", fsfile_reg);
+ 	auxiliar_newclass(L, "physfs{zip}", fszipfile_reg);
+ 	luaL_openlib(L, "fs", fslib, 0);
++	te4_native_lua_init(L);
+ 
+ 	lua_settop(L, 0);
+ 	return 1;
 --- a/src/physfs/archivers/bind_physfs.c
 +++ b/src/physfs/archivers/bind_physfs.c
 @@ -195,7 +195,7 @@
@@ -268,24 +590,6 @@
  #  define PHYSFS_PLATFORM_HAIKU
  #  define PHYSFS_PLATFORM_BEOS
  #  define PHYSFS_PLATFORM_POSIX
---- a/src/physfs.c
-+++ b/src/physfs.c
-@@ -30,6 +30,7 @@
- #include "zlib.h"
- #include "types.h"
- #include "main.h"
-+#include "NativeLua.h"
- 
- /******************************************************************
-  ******************************************************************
-@@ -635,6 +636,7 @@
- 	auxiliar_newclass(L, "physfs{file}", fsfile_reg);
- 	auxiliar_newclass(L, "physfs{zip}", fszipfile_reg);
- 	luaL_openlib(L, "fs", fslib, 0);
-+	te4_native_lua_init(L);
- 
- 	lua_settop(L, 0);
- 	return 1;
 --- a/src/tSDL.h
 +++ b/src/tSDL.h
 @@ -1,8 +1,8 @@
@@ -310,42 +614,3 @@
  #  define OS_CODE  7
  #  ifndef Z_SOLO
  #    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os
---- /dev/null
-+++ b/game/loader/native-lua51.lua
-@@ -0,0 +1,36 @@
-+-- Resolve the engine's documented instant resolvers before dependent fields.
-+-- Installed before Entity methods are inherited by Actor/Object subclasses.
-+return function(Entity)
-+	if Entity.__native_lua51_resolvers then return end
-+	local resolve = Entity.resolve
-+
-+	function Entity:resolve(t, last, on_entity, key_chain)
-+		t = t or self
-+		key_chain = key_chain or {}
-+		local instant = {}
-+		for k, value in pairs(t) do
-+			if type(value) == "table" and value.__resolver and value.__resolve_instant
-+				and (not value.__resolve_last or last) then
-+				instant[k] = value
-+			end
-+		end
-+		local function calculate(value, k)
-+			return resolvers.calc[value.__resolver](value, on_entity or self, self, t, k, key_chain)
-+		end
-+		for k, value in pairs(instant) do
-+			-- A preceding resolver may have changed another field.
-+			if t[k] == value then
-+				local result = calculate(value, k)
-+				t[k] = result
-+				-- Preserve upstream handling of an immediately returned resolver.
-+				if type(result) == "table" and result.__resolver and result.__resolve_instant
-+					and (not result.__resolve_last or last) then
-+					t[k] = calculate(result, k)
-+				end
-+			end
-+		end
-+		return resolve(self, t, last, on_entity, key_chain)
-+	end
-+	Entity.__native_lua51_resolvers = true
-+	print("[NATIVE LUA51] instant resolver priority enabled")
-+end

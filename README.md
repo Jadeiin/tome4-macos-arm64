@@ -13,6 +13,8 @@ See the release notes and `build-info.json` for the minimum macOS version. CI us
 The app is ad hoc signed and is not notarized by Apple. If macOS blocks it, verify the download source and allow it to open under System Settings → Privacy & Security.
 Public builds include the base game. Purchased DLC can be imported locally.
 
+Fullscreen opens a native macOS Space without changing the monitor’s resolution or minimizing the game during app switching. Game Mode can activate on supported macOS versions. On a 2× Retina display, set Screen Zoom to 200% for the usual interface size.
+
 ## Build from source
 
 You need an Apple Silicon Mac, Apple Command Line Tools, and native Homebrew.
@@ -37,6 +39,7 @@ The deployment target defaults to the build host’s macOS version. Set `TOME_MA
 
 Packaging copies runtime libraries other than system libraries into `Contents/Frameworks`, rewrites their paths to relative references, and signs the app again. SDL3, which SDL2 loads dynamically, is also bundled.
 The library manifest and provenance are recorded in `Contents/Resources/runtime-libraries.json`; license files and Homebrew formula metadata are in `ThirdPartyLicenses`.
+`Info.plist` declares the role-playing game category and Game Mode support. `--build-version` sets a numeric native bundle revision independently of the game version; CI uses its run number.
 macOS provides system libraries and frameworks. Repackaging after a Homebrew update uses the versions currently installed; the Brewfile does not pin versions.
 
 ## Native compatibility code
@@ -44,10 +47,11 @@ macOS provides system libraries and frameworks. Repackaging after a Homebrew upd
 Version control tracks:
 
 - `scripts/build-native.py`: native builds with Apple Clang, excluding the old Lua runtime, Steam integration, and legacy embedded browser.
-- `scripts/NativeMain.m`: Cocoa startup, app resource directory handling, and exclusive fullscreen restoration when switching applications. See the [fullscreen investigation](docs/macos-fullscreen.md).
+- `scripts/NativeMain.m`: Cocoa startup, app resource directory handling, and native macOS fullscreen Spaces. See the [fullscreen and Game Mode notes](docs/macos-native-fullscreen.md).
+- `scripts/native-display.lua`: one fullscreen option and window sizes that fit the current desktop. Retina rendering keeps window and mouse coordinates consistent.
 - `scripts/NativeLua.c`: loading through the PhysFS virtual filesystem and the original `table.sort(list, "field")` extension.
 - `scripts/lua51-resolvers.lua`: runs instant resolvers that can be handled at the current stage first, avoiding unresolved inscription dependencies. The filename comes from the original diagnostic version; the current runtime uses LuaJIT.
-- `scripts/patch-native.py` and `patches/native-arm64.patch`: idempotent application and recording of macOS compatibility patches.
+- `scripts/patch-native.py` and `patches/native-arm64.patch`: the canonical upstream patch and its repeatable installer. The installer restores cached upstream originals before applying the patch and copies the Lua helpers.
 - Packaging, verification, and release scripts, the Brewfile, source metadata, and GitHub Actions.
 
 Official downloads, extracted sources, build caches, apps, logs, DLC, settings, and saves are excluded from Git.
@@ -99,8 +103,8 @@ Build and test logs are uploaded even on failure. The build job has only `conten
 Push a new version tag to build and publish it automatically through GitHub Actions:
 
 ```sh
-git tag v1.7.6-arm64.3
-git push origin v1.7.6-arm64.3
+git tag v1.7.6-arm64.4
+git push origin v1.7.6-arm64.4
 ```
 
 Build progress and logs are available on the repository’s Actions page; published files are on the Releases page.
@@ -111,7 +115,7 @@ Complete the build and checks above, then run:
 
 ```sh
 /usr/bin/python3 scripts/package-native.py --without-dlcs
-/usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.3
+/usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.4
 ```
 
 Output is written to `dist/release/`. Rebuilding the same version replaces its generated files.
