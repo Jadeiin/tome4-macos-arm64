@@ -49,7 +49,7 @@ Version control tracks:
 - `scripts/build-native.py`: native builds with Apple Clang, excluding the old Lua runtime, Steam integration, and legacy embedded browser.
 - `scripts/NativeMain.m`: Cocoa startup, app resource directory handling, and native macOS fullscreen Spaces. See the [fullscreen and Game Mode notes](docs/macos-native-fullscreen.md).
 - `scripts/native-display.lua`: retains the upstream Fullscreen / Borderless / Windowed controls. Windowed and Borderless use the complete upstream resolution list and restart handling; native fullscreen shows the desktop rendering size. Retina rendering keeps window and mouse coordinates consistent.
-- `scripts/NativeLua.c`: loading through the PhysFS virtual filesystem, the original `table.sort(list, "field")` extension, and the original `math.mod` alias used by combat effects.
+- `scripts/NativeLua.c`: loading through the PhysFS virtual filesystem, the original `table.sort(list, "field")` extension, and the original `math.mod` / `string.gfind` aliases. See the [runtime compatibility audit](docs/luajit-runtime.md).
 - `scripts/lua51-resolvers.lua`: runs instant resolvers that can be handled at the current stage first, avoiding unresolved inscription dependencies. The filename comes from the original diagnostic version; the current runtime uses LuaJIT.
 - `scripts/patch-native.py` and `patches/native-arm64.patch`: the canonical upstream patch and its repeatable installer. The installer restores cached upstream originals before applying the patch and copies the Lua helpers.
 - Packaging, verification, and release scripts, the Brewfile, source metadata, and GitHub Actions.

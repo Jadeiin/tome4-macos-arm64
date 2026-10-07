@@ -41,17 +41,34 @@ int main(int argc, char **argv)
     lua_State *(*new_state)(void) = symbol(lua, "luaL_newstate");
     void (*open_libs)(lua_State *) = symbol(lua, "luaL_openlibs");
     int (*load)(lua_State *, const char *) = symbol(lua, "luaL_loadstring");
+    void (*push_string)(lua_State *, const char *) = symbol(lua, "lua_pushstring");
     int (*pcall)(lua_State *, int, int, int) = symbol(lua, "lua_pcall");
     const char *(*string)(lua_State *, int, size_t *) = symbol(lua, "lua_tolstring");
     void (*close)(lua_State *) = symbol(lua, "lua_close");
     lua_State *L = new_state();
     if (!L) return 2;
     open_libs(L);
-    const char *check = "assert(jit.arch=='arm64' and jit.status());"
+    const char *check = "local frameworks=...;"
+                        "package.path=frameworks..'/../Resources/game/thirdparty/?.lua';"
+                        "package.cpath='';"
+                        "assert(jit.arch=='arm64' and jit.status());"
+                        "assert(type(require('jit.v'))=='table');"
+                        "assert(type(require('jit.dump'))=='table');"
+                        "assert(type(require('jit.bcsave'))=='table');"
+                        "assert(type(require('jit.dis_arm64').disass)=='function');"
+                        "local output={};local sink={flush=function()end,write=function(_,...)"
+                        " for _,s in ipairs{...} do output[#output+1]=s end end};"
+                        "require('jit.bc').dump(function(a)return a+1 end,sink);"
+                        "assert(table.concat(output):find('ADD',1,true));"
                         "local n=0;for i=1,100000 do n=n+i end;assert(n==5000050000);"
                         "assert(require('jit.util').traceinfo(1));"
-                        "print('ARM64 LuaJIT emitted a JIT trace')";
-    if (load(L, check) || pcall(L, 0, 0, 0)) {
+                        "print('Bundled LuaJIT modules loaded and ARM64 LuaJIT emitted a JIT trace')";
+    int result = load(L, check);
+    if (!result) {
+        push_string(L, argv[1]);
+        result = pcall(L, 1, 0, 0);
+    }
+    if (result) {
         fprintf(stderr, "LuaJIT check failed: %s\n", string(L, -1, NULL));
         return 1;
     }

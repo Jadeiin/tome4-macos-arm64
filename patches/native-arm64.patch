@@ -40,6 +40,17 @@
  		end
  	end
  	return prev
+--- a/game/thirdparty/remdebug/engine.lua
++++ b/game/thirdparty/remdebug/engine.lua
+@@ -90,7 +90,7 @@
+ local function break_dir(path)
+   local paths = {}
+   path = string.gsub(path, "\\", "/")
+-  for w in string.gfind(path, "[^\/]+") do
++  for w in string.gfind(path, "[^/]+") do
+     table.insert(paths, w)
+   end
+   return paths
 --- a/src/core_lua.c
 +++ b/src/core_lua.c
 @@ -40,7 +40,7 @@

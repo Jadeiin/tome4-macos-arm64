@@ -25,6 +25,11 @@ shutil.copy2(ROOT / "build/native/t-engine", MACOS / "t-engine.new")
 for name in ["game", "bootstrap"]:
     ignore = shutil.ignore_patterns("dlcs") if name == "game" and args.without_dlcs else None
     shutil.copytree(SOURCE / name, RESOURCES / name, dirs_exist_ok=True, ignore=ignore)
+# Use the Lua scripts that belong to the linked LuaJIT runtime.
+luajit_prefix = Path(subprocess.check_output(
+    ["/opt/homebrew/bin/pkg-config", "--variable=prefix", "luajit"], text=True).strip())
+shutil.copytree(luajit_prefix / "share/luajit-2.1/jit",
+                RESOURCES / "game/thirdparty/jit", dirs_exist_ok=True)
 if args.without_dlcs and (RESOURCES / "game/dlcs").exists():
     shutil.rmtree(RESOURCES / "game/dlcs")
 for name in ["COPYING", "COPYING-MEDIA", "CREDITS"]:

@@ -1,4 +1,4 @@
-/* Restore ToME's math, sorting and PhysFS loading APIs for system LuaJIT. */
+/* Restore ToME's standard-library extensions and PhysFS loading for LuaJIT. */
 #include <stddef.h>
 #include <string.h>
 #include "lua.h"
@@ -62,6 +62,7 @@ void te4_native_lua_init(lua_State *L)
      * coroutines yieldable; the module searcher must use the virtual filesystem. */
     const char *bridge =
         "math.mod = math.fmod\n"
+        "string.gfind = string.gmatch\n"
         "local sort = table.sort\n"
         "function table.sort(list, compare)\n"
         " if compare ~= nil and type(compare) ~= 'function' then\n"

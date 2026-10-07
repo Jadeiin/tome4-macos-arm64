@@ -36,8 +36,8 @@ def check(label, executable, directory):
         raise RuntimeError(f"Runtime escaped the bundle or libraries are missing: {external}; {set(names) - set(bundled)}")
     reports.append({"label": label, "loaded_bundled_libraries": bundled,
                     "external_non_system_images": external, "sdl3_backend": True,
-                    "arm64_jit_trace": True, "passed": True})
-    print(f"{label}: loaded all {len(bundled)} bundled libraries; SDL3 and ARM64 JIT passed.")
+                    "arm64_jit_trace": True, "luajit_lua_modules": True, "passed": True})
+    print(f"{label}: loaded all {len(bundled)} bundled libraries; SDL3, ARM64 JIT and LuaJIT modules passed.")
 
 
 check("original location", runner, FRAMEWORKS)
@@ -45,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix="bundle-relocated-", dir=ROOT / "build")
     contents = Path(temporary) / "Runtime Check.app/Contents"
     moved = contents / "Frameworks"
     shutil.copytree(FRAMEWORKS, moved, symlinks=True)
+    shutil.copytree(APP / "Contents/Resources/game/thirdparty/jit",
+                    contents / "Resources/game/thirdparty/jit")
     binary = contents / "MacOS/runtime-check"
     binary.parent.mkdir()
     shutil.copy2(runner, binary)

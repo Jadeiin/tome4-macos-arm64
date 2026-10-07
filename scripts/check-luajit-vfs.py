@@ -18,14 +18,31 @@ for name in ["DUAL_WEAPON_DEFENSE", "PARRY", "COUNTER_ATTACKING", "DEFENSIVE_GRA
     start = physical.rfind("\nnewEffect{", 0, physical.index(f'name = "{name}"')) + 1
     end = physical.index("\nnewEffect{", start + 1)
     effects.append(physical[start:end])
+with zipfile.ZipFile(SOURCE / "game/addons/tome-remote-designer.teaa") as z:
+    cookies = z.read("overload/codeweb/cookies.lua").decode()
+debugger = (SOURCE / "game/thirdparty/remdebug/engine.lua").read_text()
+strings = []
+for text, signature in [(cookies, "local function read_cookies (req)"),
+                        (debugger, "local function break_dir(path)")]:
+    start = text.index(signature)
+    strings.append(text[start:text.index("\nend", start) + 4])
+strings.append("return {read_cookies=read_cookies, break_dir=break_dir}")
 archive = BUILD / "luajit-vfs.zip"
 with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
     z.writestr("fixtures/module.lua", 'return {name="native virtual module"}\n')
     z.writestr("fixtures/yield.lua", 'return coroutine.yield("waiting",nil,3)\n')
     z.writestr("fixtures/invalid.lua", 'local = invalid syntax\n')
     z.writestr("fixtures/physical-effects.lua", "\n".join(effects))
+    z.writestr("fixtures/legacy-strings.lua", "\n".join(strings))
     z.writestr("fixtures/check.lua", r'''
 assert(jit.arch=="arm64" and jit.status())
+local legacy=dofile("/fixtures/legacy-strings.lua")
+local request={headers={cookie='first="a"; second="b"; $Path="/game"'}}
+legacy.read_cookies(request)
+assert(request.cookies.first.value=="a" and request.cookies.second.value=="b")
+assert(request.cookies.second.options.Path=="/game")
+local parts=legacy.break_dir([[C:\games\T-Engine/file.lua]])
+assert(#parts==4 and parts[1]=="C:" and parts[4]=="file.lua")
 local effects = {}
 _t=function(s) return s end
 newEffect=function(effect) effects[effect.name]=effect end
@@ -69,7 +86,7 @@ end)
 local result=pack(coroutine.resume(co))
 assert(result.n==4 and result[1] and result[2]=="waiting" and result[3]==nil and result[4]==3)
 assert(coroutine.resume(co,8,nil,9) and coroutine.status(co)=="dead")
-print("PASS: native LuaJIT original parry/counter/grapple effects and math.mod, ToME field-key/default/callback sorting, PhysFS archive loadfile/require, missing/syntax errors, and yieldable dofile")
+print("PASS: native LuaJIT original cookie/debugger parsing, parry/counter/grapple effects and math.mod, ToME sorting, PhysFS loading, missing/syntax errors, and yieldable dofile")
 ''')
 objects = []
 obj = ROOT / "build/native/obj/t-engine4-src-1.7.6/src"
