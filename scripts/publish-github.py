@@ -112,12 +112,15 @@ def main():
     write_report(report)
     try:
         probe = Forge(f"placeholder/{args.name}")
-        owner = probe.api("user")["login"]
+        account = probe.api("user")
+        owner = account["login"]
         repository = f"{owner}/{args.name}"
         forge = Forge(repository)
         report["repository"] = f"https://github.com/{repository}"
         if not (ROOT / ".git").exists():
             git("init", "-b", "main")
+        git("config", "--local", "user.name", owner)
+        git("config", "--local", "user.email", f"{account['id']}+{owner}@users.noreply.github.com")
         if Path(git("rev-parse", "--show-toplevel", capture=True)).resolve() != ROOT.resolve():
             raise RuntimeError("This directory is inside a different Git repository; kept unchanged.")
         if git("symbolic-ref", "--short", "HEAD", capture=True) != "main":
