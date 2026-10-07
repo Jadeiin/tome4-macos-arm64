@@ -1,20 +1,22 @@
-# Tales of Maj’Eyal — Apple Silicon 原生构建
+# Tales of Maj’Eyal — Native Apple Silicon Build
 
-ToME **1.7.6** 的社区 ARM64 macOS 构建。使用官方完整源码和资源，运行时采用 LuaJIT 2.1、SDL2/SDL3 兼容层和 OpenAL Soft。
-游戏及捆绑的动态库均为 ARM64，运行无需 Homebrew 或 Rosetta。
+English | [简体中文](README.zh-CN.md)
 
-## 下载与安装
+A community ARM64 macOS build of ToME **1.7.6**, using the complete official source and resources with LuaJIT 2.1, the SDL2/SDL3 compatibility layer, and OpenAL Soft.
+The game and all bundled dynamic libraries are ARM64. Homebrew and Rosetta are not required to run it.
 
-从本仓库 **Releases** 下载 `.dmg`，打开后将 `Tales of Maj’Eyal.app` 拖到 Applications。
-最低 macOS 版本见对应 Release 和 `build-info.json`；CI 使用 `macos-15` 的 ARM64 runner，打包时也会检查动态库要求的系统版本。
+## Download and install
 
-应用使用 ad hoc 签名，未进行 Apple 公证。若 macOS 拦截，确认下载来源后在系统设置的“隐私与安全性”中允许打开。
-公开构建包含游戏本体；购买的 DLC 可在本机导入。
+Download the `.dmg` from this repository’s [Releases](https://github.com/Jadeiin/tome4-macos-arm64/releases), open it, and drag `Tales of Maj’Eyal.app` to Applications.
+See the release notes and `build-info.json` for the minimum macOS version. CI uses an ARM64 `macos-15` runner, and packaging checks the macOS versions required by the bundled libraries.
 
-## 从源码构建
+The app is ad hoc signed and is not notarized by Apple. If macOS blocks it, verify the download source and allow it to open under System Settings → Privacy & Security.
+Public builds include the base game. Purchased DLC can be imported locally.
 
-需要 Apple Silicon Mac、Apple Command Line Tools 和原生 Homebrew。
-在仓库目录执行：
+## Build from source
+
+You need an Apple Silicon Mac, Apple Command Line Tools, and native Homebrew.
+Run these commands from the repository directory:
 
 ```sh
 /opt/homebrew/bin/brew bundle install --file=Brewfile --no-upgrade
@@ -26,35 +28,35 @@ ToME **1.7.6** 的社区 ARM64 macOS 构建。使用官方完整源码和资源�
 open "dist/Tales of Maj'Eyal.app"
 ```
 
-`project.json` 固定官方源码版本、下载地址和 SHA-256。下载器校验完整归档后再提取；若源码目录已存在，会保留它并退出。
-已有源码时，重新构建可直接从 `build-native.py` 开始。
+`project.json` pins the official source version, download URL, and SHA-256. The downloader verifies the complete archive before extracting it; if the source directory already exists, it preserves the directory and exits.
+For subsequent builds with existing sources, start with `build-native.py`.
 
-Brewfile 声明 9 个直接依赖：`pkgconf`、`sdl2-compat`、`sdl2_image`、`sdl2_ttf`、`libpng`、`libogg`、`libvorbis`、`openal-soft`、`luajit`。间接依赖由 Homebrew 安装。
-OpenAL Soft 为 keg-only，构建脚本已设置 pkg-config 路径。
-默认部署目标匹配构建机；可用 `TOME_MACOS_MIN` 指定引擎目标，但应用最终最低版本不会低于捆绑动态库的要求。
+The Brewfile declares nine direct dependencies: `pkgconf`, `sdl2-compat`, `sdl2_image`, `sdl2_ttf`, `libpng`, `libogg`, `libvorbis`, `openal-soft`, and `luajit`. Homebrew installs their transitive dependencies.
+OpenAL Soft is keg-only; the build script sets its pkg-config path.
+The deployment target defaults to the build host’s macOS version. Set `TOME_MACOS_MIN` to choose the engine’s target, but the app’s final minimum version cannot be lower than the requirements of its bundled libraries.
 
-打包脚本将非系统运行库复制到 `Contents/Frameworks`，改为相对路径，并重新签名。SDL2 动态加载的 SDL3 也包含在包内。
-清单与来源记录位于 `Contents/Resources/runtime-libraries.json`，许可证文件与 Homebrew formula 位于 `ThirdPartyLicenses`。
-macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使用当时安装的版本，Brewfile 不锁定版本。
+Packaging copies runtime libraries other than system libraries into `Contents/Frameworks`, rewrites their paths to relative references, and signs the app again. SDL3, which SDL2 loads dynamically, is also bundled.
+The library manifest and provenance are recorded in `Contents/Resources/runtime-libraries.json`; license files and Homebrew formula metadata are in `ThirdPartyLicenses`.
+macOS provides system libraries and frameworks. Repackaging after a Homebrew update uses the versions currently installed; the Brewfile does not pin versions.
 
-## 原生兼容代码
+## Native compatibility code
 
-版本控制维护以下内容：
+Version control tracks:
 
-- `scripts/build-native.py`：Apple Clang 原生构建，排除旧 Lua、Steam 和旧内嵌浏览器。
-- `scripts/NativeMain.m`：Cocoa 启动和应用资源目录。
-- `scripts/NativeLua.c`：PhysFS 虚拟文件加载，以及原版 `table.sort(list, "字段名")` 扩展。
-- `scripts/lua51-resolvers.lua`：优先执行可在当前阶段处理的 instant resolver，避免铭文依赖未解析。文件名沿用最初的诊断版本，当前运行时为 LuaJIT。
-- `scripts/patch-native.py`、`patches/native-arm64.patch`：幂等应用和记录 macOS 兼容补丁。
-- 打包、校验、发布脚本、Brewfile、源码元数据和 GitHub Actions。
+- `scripts/build-native.py`: native builds with Apple Clang, excluding the old Lua runtime, Steam integration, and legacy embedded browser.
+- `scripts/NativeMain.m`: Cocoa startup and app resource directory handling.
+- `scripts/NativeLua.c`: loading through the PhysFS virtual filesystem and the original `table.sort(list, "field")` extension.
+- `scripts/lua51-resolvers.lua`: runs instant resolvers that can be handled at the current stage first, avoiding unresolved inscription dependencies. The filename comes from the original diagnostic version; the current runtime uses LuaJIT.
+- `scripts/patch-native.py` and `patches/native-arm64.patch`: idempotent application and recording of macOS compatibility patches.
+- Packaging, verification, and release scripts, the Brewfile, source metadata, and GitHub Actions.
 
-官方下载包、解压后的源码、编译缓存、应用、日志、DLC、设置与存档均不进入 Git。
-源码提取后由构建脚本应用补丁；官方游戏与 DLC 压缩档案保持原样。
-当前构建使用 ARM64 LuaJIT 2.1，不提供旧 Lua 5.1 字节码存档转换。
+Official downloads, extracted sources, build caches, apps, logs, DLC, settings, and saves are excluded from Git.
+The build script applies patches after source extraction; official game and DLC archives remain unchanged.
+This build uses ARM64 LuaJIT 2.1 and does not convert saves containing old Lua 5.1 bytecode.
 
-## 检查
+## Checks
 
-无需启动游戏窗口的检查：
+Checks that do not open a game window:
 
 ```sh
 /usr/bin/python3 scripts/check-release-tools.py
@@ -65,80 +67,67 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 /usr/bin/python3 scripts/check-bundled-runtime.py
 ```
 
-覆盖源码归档与发布文件校验、虚拟文件加载、铭文解析、真实技能代码的协程暂停与收尾，以及应用架构、动态链接、签名和迁移目录后的库加载。
-完整游戏检查在有图形会话的本机终端或 macOS runner 中运行：
+These cover source archive and release file validation, virtual filesystem loading, inscription resolution, coroutine suspension and cleanup in actual talent code, app architecture, dynamic linking, signing, and library loading after relocating the app.
+Run the full game check from a local terminal or macOS runner with a graphical session:
 
 ```sh
 /usr/bin/python3 scripts/check-first-floor.py --talents
 ```
 
-它使用独立配置创建矮人 Bulwark，进入首层，生成 100 枚铭文，再取消并完成盾牌连击目标选择，随后关闭测试游戏。
-如果应用包含 DLC，会同时检查对应模块加载；可加 `--require-dlcs` 强制要求两套购买的 DLC。
-检查记录保存在 `logs/`。默认设置和存档位于 `~/Library/Application Support/T-Engine/4.0/`，独立测试配置位于 `build/`。
-这些检查不覆盖完整战役或长时间稳定性。
+It uses an isolated profile to create a Dwarf Bulwark, enter the first floor, generate 100 inscriptions, and cancel and complete Shield Pummel targeting, then closes the test game.
+If the app includes DLC, the check also verifies that its modules load. Add `--require-dlcs` to require both purchased DLC packs.
+Check results are saved in `logs/`. Default settings and saves are under `~/Library/Application Support/T-Engine/4.0/`; isolated test profiles are under `build/`.
+These checks do not cover a full campaign or long sessions.
 
-## GitHub Actions 与 Release
+## GitHub Actions and releases
 
-[workflow](.github/workflows/build.yml) 在 `main` 更新、Pull Request、手动触发及 `v*` tag 推送时执行：
+The [workflow](.github/workflows/build.yml) runs on updates to `main`, pull requests, manual dispatch, and pushes of `v*` tags:
 
-1. 在 `macos-15` 原生 ARM64 runner 上安装 Homebrew 依赖。
-2. 下载并校验官方完整源码，应用补丁并编译。
-3. 执行 LuaJIT 回归、架构和签名检查、迁移后的运行库检查，以及真实首层与技能目标选择检查。
-4. 用 `hdiutil` 创建并校验 DMG，附带源码包、构建信息和 SHA-256 校验值。
-5. 对 `v1.7.6-arm64.N` tag，在独立发布 job 中校验文件 SHA-256，再由一个 `run` step 调用 runner 自带的 **GitHub CLI** 发布 Release。
+1. Install Homebrew dependencies on a native ARM64 `macos-15` runner.
+2. Download and verify the complete official sources, apply patches, and compile.
+3. Run LuaJIT regression checks, architecture and signature checks, library loading checks after relocation, and the actual first floor and talent targeting checks.
+4. Create and verify a DMG with `hdiutil`, accompanied by a source archive, build information, and SHA-256 checksums.
+5. For `v1.7.6-arm64.N` tags, verify file checksums in a separate release job, then publish a release in a single `run` step using the runner’s bundled **GitHub CLI**.
 
-普通分支与 PR 构建提供 Actions artifacts；只有成功的 tag 构建发布 Release。
-公开打包显式排除本机购买的 DLC。CI 游戏检查使用 OpenAL Soft 的 null 音频后端，验证不依赖 runner 的音频设备。
-Release 源码包包含对应提交的构建代码，以及经过 SHA-256 校验的官方完整源码归档。
-构建和测试日志在失败时也会上传。构建 job 仅有 `contents: read`，发布 job 才获得 `contents: write`。
+Branch and pull request builds provide Actions artifacts; successful tag builds publish releases.
+Public packaging explicitly excludes locally purchased DLC. CI game checks use OpenAL Soft’s null audio backend, so they do not depend on the runner’s audio hardware.
+The release source archive contains the build code from the corresponding commit and the complete official source archive verified against its SHA-256.
+Build and test logs are uploaded even on failure. The build job has only `contents: read`; the release job receives `contents: write`.
 
-### 使用 forge 初始化仓库和首次发布
+### Publish a new version
 
-本机需要已登录的 forge，以及可用的 GitHub Git HTTPS 凭据或 SSH key：
-
-```sh
-forge auth status
-/usr/bin/python3 scripts/publish-github.py --visibility public --proxy http://127.0.0.1:20122
-```
-
-脚本只暂存核心代码，初始化 `main`，创建当前 GitHub 账户下的 `tome4-macos-arm64` 仓库，推送 `v1.7.6-arm64.1`，随后用 forge 等待构建、保存各 job 的日志并检查 Release。
-不需要本机重新安装游戏构建依赖。Git 推送默认使用已有 HTTPS 凭据；用 SSH 时加 `--ssh`。
-后续发布使用新的 tag，例如 `--tag v1.7.6-arm64.2`。脚本不会强制推送、移动已有 tag 或改写已有仓库的可见性。
-结果保存在 `logs/github-publish.json`，Action 日志保存在 `logs/actions/`。
-
-手动检查远端：
+Push a new version tag to build and publish it automatically through GitHub Actions:
 
 ```sh
-forge ci list
-forge ci view RUN_ID
-forge ci log JOB_ID
-forge release list
-forge release view v1.7.6-arm64.1
+git tag v1.7.6-arm64.3
+git push origin v1.7.6-arm64.3
 ```
 
-### 本机生成发布文件
+Build progress and logs are available on the repository’s Actions page; published files are on the Releases page.
 
-先完成编译及上述检查，再执行：
+### Create release files locally
+
+Complete the build and checks above, then run:
 
 ```sh
 /usr/bin/python3 scripts/package-native.py --without-dlcs
-/usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.1
+/usr/bin/python3 scripts/make-release.py --tag v1.7.6-arm64.3
 ```
 
-输出位于 `dist/release/`。再次打包前需保留或移走已有发布文件。
-普通本机构建保留导入的 DLC；公开 DMG 打包会拒绝包含 DLC 文件的应用。
+Output is written to `dist/release/`. Keep or move existing release files before packaging again.
+Regular local builds retain imported DLC; public DMG packaging rejects apps containing DLC files.
 
-## 导入已购买的 DLC
+## Import purchased DLC
 
 ```sh
 /usr/bin/python3 scripts/import-dlcs.py "/path/to/SteamLibrary/steamapps/common/TalesMajEyal/game/dlcs"
 /usr/bin/python3 scripts/package-native.py
 ```
 
-DLC 文件来自用户自己的 Steam 安装，仅在本机复制和校验。职业和种族解锁仍遵循游戏规则。
+DLC files come from your own Steam installation and are copied and verified locally. Class and race unlocks still follow the game’s rules.
 
-## 来源与许可
+## Sources and licenses
 
-官方游戏与源码：<https://te4.org/>；官方下载地址和哈希见 `project.json`。
-引擎及本仓库的原生兼容代码使用 GPL-3.0，见 [LICENSE](LICENSE)。媒体适用官方 `COPYING-MEDIA`，仅用于 Tales of Maj’Eyal 游戏。
-应用中保留官方许可和致谢，以及第三方运行库的许可与来源信息。这是社区构建，与官方发行版独立。
+Official game and source: <https://te4.org/>. Official download URLs and hashes are recorded in `project.json`.
+The engine and this repository’s native compatibility code are licensed under GPL-3.0; see [LICENSE](LICENSE). Media is covered by the upstream `COPYING-MEDIA` and is for use only with Tales of Maj’Eyal.
+The app retains upstream licenses and credits, along with license and provenance information for third-party runtime libraries. This is a community build, separate from the official distribution.

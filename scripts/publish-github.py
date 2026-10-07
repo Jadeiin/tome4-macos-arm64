@@ -13,7 +13,7 @@ from pathlib import Path
 from forge_client import Forge
 from project import LOGS, ROOT, VERSION
 
-CORE_PATHS = [".gitignore", "README.md", "LICENSE", "Brewfile", "project.json", ".github", "scripts", "patches/native-arm64.patch"]
+CORE_PATHS = [".gitignore", "README.md", "README.zh-CN.md", "LICENSE", "Brewfile", "project.json", ".github", "scripts", "patches/native-arm64.patch"]
 TOP_FILES = {path for path in CORE_PATHS if '/' not in path and not path.startswith('scripts') and path != '.github'}
 REPORT = LOGS / "github-publish.json"
 
