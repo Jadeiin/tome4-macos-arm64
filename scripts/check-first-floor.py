@@ -14,9 +14,9 @@ from project import APP, LOGS, ROOT
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--seconds", type=int, default=120, help="Maximum test runtime")
 parser.add_argument("--talents", action="store_true", help="Also cancel and complete real Shield Pummel targeting")
-parser.add_argument("--require-dlcs", action="store_true", help="Also require both paid DLCs to load")
+parser.add_argument("--require-dlcs", action="store_true", help="Also require all three paid DLCs to load")
 args = parser.parse_args()
-dlc_names = {"ashes-urhrok": "ashes-urhrok.teaac", "orcs": "orcs.teaac"}
+dlc_names = {"ashes-urhrok": "ashes-urhrok.teaac", "orcs": "orcs.teaac", "cults": "cults.teaac"}
 expected_dlcs = [name for name, archive in dlc_names.items()
                  if args.require_dlcs or (APP / "Contents/Resources/game/dlcs" / archive).is_file()]
 stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

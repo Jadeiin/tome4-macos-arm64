@@ -75,7 +75,7 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 ```
 
 它使用独立配置创建矮人 Bulwark，进入首层，生成 100 枚铭文，再取消并完成盾牌连击目标选择，随后关闭测试游戏。
-如果应用包含 DLC，会同时检查对应模块加载；可加 `--require-dlcs` 强制要求两套购买的 DLC。
+如果应用包含 DLC，会同时检查对应模块加载；可加 `--require-dlcs` 强制要求三套购买的 DLC：Ashes of Urh’Rok、Embers of Rage 和 Forbidden Cults。
 检查记录保存在 `logs/`。默认设置和存档位于 `~/Library/Application Support/T-Engine/4.0/`，独立测试配置位于 `build/`。
 这些检查不覆盖完整战役或长时间稳定性。
 

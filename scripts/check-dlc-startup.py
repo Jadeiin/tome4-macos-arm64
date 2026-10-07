@@ -43,6 +43,7 @@ with (logs / "dlc-verified-stderr.log").open("w") as output:
             "fresh_log": fresh_log,
             "ashes_loaded": "[MODULE LOADER] addon \tashes-urhrok\t MD5" in startup,
             "orcs_loaded": "[MODULE LOADER] addon \torcs\t MD5" in startup,
+            "cults_loaded": "[MODULE LOADER] addon \tcults\t MD5" in startup,
             "tome_loaded": "[MODULE LOADER] done loading module\tTales of Maj'Eyal: Age of Ascendancy" in startup,
             "no_lua_errors": bool(startup) and "Lua Error:" not in startup,
             "openal_soft": "OpenAL Soft" in startup,

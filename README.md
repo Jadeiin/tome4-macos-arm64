@@ -75,7 +75,7 @@ Run the full game check from a local terminal or macOS runner with a graphical s
 ```
 
 It uses an isolated profile to create a Dwarf Bulwark, enter the first floor, generate 100 inscriptions, and cancel and complete Shield Pummel targeting, then closes the test game.
-If the app includes DLC, the check also verifies that its modules load. Add `--require-dlcs` to require both purchased DLC packs.
+If the app includes DLC, the check also verifies that its modules load. Add `--require-dlcs` to require all three purchased DLC packs: Ashes of Urh’Rok, Embers of Rage, and Forbidden Cults.
 Check results are saved in `logs/`. Default settings and saves are under `~/Library/Application Support/T-Engine/4.0/`; isolated test profiles are under `build/`.
 These checks do not cover a full campaign or long sessions.
 
