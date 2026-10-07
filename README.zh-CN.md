@@ -48,7 +48,7 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 
 - `scripts/build-native.py`：Apple Clang 原生构建，排除旧 Lua、Steam 和旧内嵌浏览器。
 - `scripts/NativeMain.m`：Cocoa 启动、应用资源目录，以及 macOS 原生全屏 Space。详见[全屏和游戏模式说明](docs/macos-native-fullscreen.md)。
-- `scripts/native-display.lua`：单一全屏选项，以及适合当前桌面的窗口尺寸；Retina 渲染保持窗口和鼠标坐标一致。
+- `scripts/native-display.lua`：保留原版全屏／无边框／窗口选项；窗口与无边框复用完整原版分辨率列表及重启流程，原生全屏显示桌面渲染尺寸。Retina 渲染保持窗口和鼠标坐标一致。
 - `scripts/NativeLua.c`：PhysFS 虚拟文件加载，以及原版 `table.sort(list, "字段名")` 扩展。
 - `scripts/lua51-resolvers.lua`：优先执行可在当前阶段处理的 instant resolver，避免铭文依赖未解析。文件名沿用最初的诊断版本，当前运行时为 LuaJIT。
 - `scripts/patch-native.py`、`patches/native-arm64.patch`：统一的上游补丁与可重复执行的安装脚本；脚本从缓存的官方原始文件恢复后应用补丁，并复制 Lua 辅助代码。

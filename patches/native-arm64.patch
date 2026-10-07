@@ -84,13 +84,13 @@
  	return 6;
 +}
 +
-+static int sdl_usable_size(lua_State *L)
++static int sdl_desktop_size(lua_State *L)
 +{
 +	SDL_Rect bounds;
-+	if (SDL_GetDisplayUsableBounds(SDL_GetWindowDisplayIndex(window), &bounds) != 0)
++	if (SDL_GetDisplayBounds(SDL_GetWindowDisplayIndex(window), &bounds) != 0)
 +		return luaL_error(L, "%s", SDL_GetError());
-+	lua_pushinteger(L, bounds.w);
-+	lua_pushinteger(L, bounds.h);
++	lua_pushinteger(L, bounds.w * window_scale);
++	lua_pushinteger(L, bounds.h * window_scale);
 +	return 2;
  }
  
@@ -108,7 +108,7 @@
  	{"forceRedrawForScreenshot", sdl_redraw_screen_for_screenshot},
  	{"redrawingForSavefileScreenshot", redrawing_for_savefile_screenshot},
  	{"size", sdl_screen_size},
-+	{"usableSize", sdl_usable_size},
++	{"desktopSize", sdl_desktop_size},
  	{"windowPos", sdl_window_pos},
  	{"newFont", sdl_new_font},
  	{"newSurface", sdl_new_surface},
