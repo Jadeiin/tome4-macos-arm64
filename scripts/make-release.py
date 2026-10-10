@@ -58,7 +58,7 @@ def main():
         split = layout == "split"
         dmg = directory / f"{stem}{'-split' if split else ''}.dmg"
         source = app.parent if split else app
-        install = ("Drag the entire Tales of Maj'Eyal folder to Applications. Keep the app, game and bootstrap together."
+        install = ("Drag the entire Tales of Maj'Eyal folder to Applications. Keep T-Engine.app, game and bootstrap together."
                    if split else "Drag the app to Applications.")
         with tempfile.TemporaryDirectory(prefix="dmg-stage-", dir=ROOT / "build") as temporary:
             stage = Path(temporary)
@@ -93,7 +93,7 @@ def main():
         f"Native Apple Silicon build of Tales of Maj'Eyal {VERSION}.\n\n"
         "## Choose a layout\n\n"
         f"- **Bundled** — `{layouts['bundled']['file']}`: drag the app to Applications. Game assets are inside the app.\n"
-        f"- **Split** — `{layouts['split']['file']}`: drag the entire game folder to Applications. The app, `game/` and `bootstrap/` stay together; DLC and addons can be managed beside the app.\n\n"
+        f"- **Split** — `{layouts['split']['file']}`: drag the entire game folder to Applications. `T-Engine.app`, `game/` and `bootstrap/` stay together; DLC and addons can be managed beside the app.\n\n"
         "## Requirements and contents\n\n"
         f"- Requires macOS **{minimum_macos}+**; ARM64 only.\n"
         "- Bundled LuaJIT 2.1, SDL and OpenAL Soft; no Homebrew or Rosetta needed.\n"

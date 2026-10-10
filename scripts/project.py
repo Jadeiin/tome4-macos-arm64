@@ -11,7 +11,7 @@ SOURCE = ROOT / PROJECT["source_directory"]
 ARCHIVE = ROOT / "downloads" / PROJECT["source_archive"]
 APP = ROOT / "dist" / "Tales of Maj'Eyal.app"
 SPLIT = ROOT / "dist" / "Tales of Maj'Eyal"
-APPS = {"bundled": APP, "split": SPLIT / APP.name}
+APPS = {"bundled": APP, "split": SPLIT / "T-Engine.app"}
 LOGS = ROOT / "logs"
 LOGS.mkdir(parents=True, exist_ok=True)
 

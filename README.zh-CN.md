@@ -12,7 +12,7 @@ ToME **1.7.6** 的社区 ARM64 macOS 构建。使用官方完整源码和资源�
 | 下载文件 | 布局 | 安装方法 |
 | --- | --- | --- |
 | `Tales-of-MajEyal-…-arm64.N.dmg` | 游戏资产位于 `.app` 内 | 将 `Tales of Maj'Eyal.app` 拖到 Applications。 |
-| `Tales-of-MajEyal-…-arm64.N-split.dmg` | `.app` 与 `game/`、`bootstrap/` 并列 | 将整个 `Tales of Maj'Eyal` 文件夹拖到 Applications 或其他位置，保持目录内容在一起。 |
+| `Tales-of-MajEyal-…-arm64.N-split.dmg` | `T-Engine.app` 与 `game/`、`bootstrap/` 并列 | 将整个 `Tales of Maj'Eyal` 文件夹拖到 Applications 或其他位置，保持目录内容在一起。 |
 
 两种布局使用同一引擎，运行库均捆绑在 `.app` 内。分离布局可直接管理 DLC 和 addon 文件，无需打开应用包。
 最低 macOS 版本见对应 Release 和 `build-info.json`；CI 使用 `macos-15` 的 ARM64 runner，打包时也会检查动态库要求的系统版本。
@@ -39,7 +39,7 @@ open "dist/Tales of Maj'Eyal.app"
 
 `project.json` 固定官方源码版本、下载地址和 SHA-256。下载器校验完整归档后再提取；若源码目录已存在，会保留它并退出。
 已有源码时，重新构建可直接从 `build-native.py` 开始。
-`package-native.py` 同时生成 `dist/Tales of Maj'Eyal.app` 和 `dist/Tales of Maj'Eyal/`；打开后者目录中的应用即可使用分离布局。
+`package-native.py` 同时生成 `dist/Tales of Maj'Eyal.app` 和 `dist/Tales of Maj'Eyal/`；打开 `dist/Tales of Maj'Eyal/T-Engine.app` 即可使用分离布局。
 
 Brewfile 声明 9 个直接依赖：`pkgconf`、`sdl2-compat`、`sdl2_image`、`sdl2_ttf`、`libpng`、`libogg`、`libvorbis`、`openal-soft`、`luajit`。间接依赖由 Homebrew 安装。
 OpenAL Soft 为 keg-only，构建脚本已设置 pkg-config 路径。

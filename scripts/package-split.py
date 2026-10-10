@@ -17,6 +17,8 @@ plist = app / "Contents/Info.plist"
 with plist.open("rb") as stream:
     info = plistlib.load(stream)
 info["TE4AssetLayout"] = "split"
+info["CFBundleName"] = "T-Engine"
+info["CFBundleDisplayName"] = "T-Engine"
 with plist.open("wb") as stream:
     plistlib.dump(info, stream)
 subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], check=True)

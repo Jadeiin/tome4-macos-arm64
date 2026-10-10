@@ -12,7 +12,7 @@ Each [Release](https://github.com/Jadeiin/tome4-macos-arm64/releases) provides t
 | Download | Layout | Installation |
 | --- | --- | --- |
 | `Tales-of-MajEyal-…-arm64.N.dmg` | Game assets inside the app | Drag `Tales of Maj'Eyal.app` to Applications. |
-| `Tales-of-MajEyal-…-arm64.N-split.dmg` | App beside `game/` and `bootstrap/` | Drag the entire `Tales of Maj'Eyal` folder to Applications or another location. Keep its contents together. |
+| `Tales-of-MajEyal-…-arm64.N-split.dmg` | `T-Engine.app` beside `game/` and `bootstrap/` | Drag the entire `Tales of Maj'Eyal` folder to Applications or another location. Keep its contents together. |
 
 Both use the same engine and bundle their runtime libraries inside the app. The split layout makes DLC and addon files accessible without opening the app bundle.
 See the release notes and `build-info.json` for the minimum macOS version. CI uses an ARM64 `macos-15` runner, and packaging checks the macOS versions required by the bundled libraries.
@@ -39,7 +39,7 @@ open "dist/Tales of Maj'Eyal.app"
 
 `project.json` pins the official source version, download URL, and SHA-256. The downloader verifies the complete archive before extracting it; if the source directory already exists, it preserves the directory and exits.
 For subsequent builds with existing sources, start with `build-native.py`.
-`package-native.py` creates both `dist/Tales of Maj'Eyal.app` and `dist/Tales of Maj'Eyal/`. Open the app inside the latter directory to use the split layout.
+`package-native.py` creates both `dist/Tales of Maj'Eyal.app` and `dist/Tales of Maj'Eyal/`. Open `dist/Tales of Maj'Eyal/T-Engine.app` to use the split layout.
 
 The Brewfile declares nine direct dependencies: `pkgconf`, `sdl2-compat`, `sdl2_image`, `sdl2_ttf`, `libpng`, `libogg`, `libvorbis`, `openal-soft`, and `luajit`. Homebrew installs their transitive dependencies.
 OpenAL Soft is keg-only; the build script sets its pkg-config path.
