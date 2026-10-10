@@ -28,7 +28,7 @@ static void *symbol(void *handle, const char *name)
 
 int main(int argc, char **argv)
 {
-    if (argc < 3) return 2;
+    if (argc < 4) return 2;
     void *sdl = open_library(argv[1], "libSDL2-2.0.0.dylib");
     int (*init)(uint32_t) = symbol(sdl, "SDL_Init");
     void (*quit)(void) = symbol(sdl, "SDL_Quit");
@@ -48,8 +48,8 @@ int main(int argc, char **argv)
     lua_State *L = new_state();
     if (!L) return 2;
     open_libs(L);
-    const char *check = "local frameworks=...;"
-                        "package.path=frameworks..'/../Resources/game/thirdparty/?.lua';"
+    const char *check = "local resources=...;"
+                        "package.path=resources..'/game/thirdparty/?.lua';"
                         "package.cpath='';"
                         "assert(jit.arch=='arm64' and jit.status());"
                         "assert(type(require('jit.v'))=='table');"
@@ -65,14 +65,14 @@ int main(int argc, char **argv)
                         "print('Bundled LuaJIT modules loaded and ARM64 LuaJIT emitted a JIT trace')";
     int result = load(L, check);
     if (!result) {
-        push_string(L, argv[1]);
+        push_string(L, argv[2]);
         result = pcall(L, 1, 0, 0);
     }
     if (result) {
         fprintf(stderr, "LuaJIT check failed: %s\n", string(L, -1, NULL));
         return 1;
     }
-    for (int i = 2; i < argc; i++) open_library(argv[1], argv[i]);
+    for (int i = 3; i < argc; i++) open_library(argv[1], argv[i]);
     for (uint32_t i = 0; i < _dyld_image_count(); i++)
         printf("IMAGE\t%s\n", _dyld_get_image_name(i));
     close(L);

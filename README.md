@@ -7,7 +7,14 @@ The game and all bundled dynamic libraries are ARM64. Homebrew and Rosetta are n
 
 ## Download and install
 
-Download the `.dmg` from this repository’s [Releases](https://github.com/Jadeiin/tome4-macos-arm64/releases), open it, and drag `Tales of Maj’Eyal.app` to Applications.
+Each [Release](https://github.com/Jadeiin/tome4-macos-arm64/releases) provides two DMGs:
+
+| Download | Layout | Installation |
+| --- | --- | --- |
+| `Tales-of-MajEyal-…-arm64.N.dmg` | Game assets inside the app | Drag `Tales of Maj'Eyal.app` to Applications. |
+| `Tales-of-MajEyal-…-arm64.N-split.dmg` | App beside `game/` and `bootstrap/` | Drag the entire `Tales of Maj'Eyal` folder to Applications or another location. Keep its contents together. |
+
+Both use the same engine and bundle their runtime libraries inside the app. The split layout makes DLC and addon files accessible without opening the app bundle.
 See the release notes and `build-info.json` for the minimum macOS version. CI uses an ARM64 `macos-15` runner, and packaging checks the macOS versions required by the bundled libraries.
 
 The app is ad hoc signed and is not notarized by Apple. If macOS blocks it, verify the download source and allow it to open under System Settings → Privacy & Security.
@@ -32,6 +39,7 @@ open "dist/Tales of Maj'Eyal.app"
 
 `project.json` pins the official source version, download URL, and SHA-256. The downloader verifies the complete archive before extracting it; if the source directory already exists, it preserves the directory and exits.
 For subsequent builds with existing sources, start with `build-native.py`.
+`package-native.py` creates both `dist/Tales of Maj'Eyal.app` and `dist/Tales of Maj'Eyal/`. Open the app inside the latter directory to use the split layout.
 
 The Brewfile declares nine direct dependencies: `pkgconf`, `sdl2-compat`, `sdl2_image`, `sdl2_ttf`, `libpng`, `libogg`, `libvorbis`, `openal-soft`, and `luajit`. Homebrew installs their transitive dependencies.
 OpenAL Soft is keg-only; the build script sets its pkg-config path.
@@ -69,6 +77,8 @@ Checks that do not open a game window:
 /usr/bin/python3 scripts/check-talent-coroutines.py
 /usr/bin/python3 scripts/verify-native.py
 /usr/bin/python3 scripts/check-bundled-runtime.py
+/usr/bin/python3 scripts/verify-native.py --layout split
+/usr/bin/python3 scripts/check-bundled-runtime.py --layout split
 ```
 
 These cover source archive and release file validation, virtual filesystem loading, inscription resolution, coroutine suspension and cleanup in actual talent code, app architecture, dynamic linking, signing, and library loading after relocating the app.
@@ -76,6 +86,7 @@ Run the full game check from a local terminal or macOS runner with a graphical s
 
 ```sh
 /usr/bin/python3 scripts/check-first-floor.py --talents
+/usr/bin/python3 scripts/check-first-floor.py --layout split --talents
 ```
 
 It uses an isolated profile to create a Dwarf Bulwark, enter the first floor, generate 100 inscriptions, and cancel and complete Shield Pummel targeting, then closes the test game.
@@ -90,7 +101,7 @@ The [workflow](.github/workflows/build.yml) runs on updates to `main`, pull requ
 1. Install Homebrew dependencies on a native ARM64 `macos-15` runner.
 2. Download and verify the complete official sources, apply patches, and compile.
 3. Run LuaJIT regression checks, architecture and signature checks, library loading checks after relocation, and the actual first floor and talent targeting checks.
-4. Create and verify a DMG with `hdiutil`, accompanied by a source archive, build information, and SHA-256 checksums.
+4. Create and verify both asset-layout DMGs with `hdiutil`, accompanied by a shared source archive, build information, and SHA-256 checksums.
 5. For `v1.7.6-arm64.N` tags, verify file checksums in a separate release job, then publish a release in a single `run` step using the runner’s bundled **GitHub CLI**.
 
 Branch and pull request builds provide Actions artifacts; successful tag builds publish releases.
@@ -119,7 +130,7 @@ Complete the build and checks above, then run:
 ```
 
 Output is written to `dist/release/`. Rebuilding the same version replaces its generated files.
-Regular local builds retain imported DLC; public DMG packaging rejects apps containing DLC files.
+Regular local builds include imported DLC in both layouts; public DMG packaging rejects layouts containing DLC files.
 
 ## Import purchased DLC
 
@@ -129,6 +140,7 @@ Regular local builds retain imported DLC; public DMG packaging rejects apps cont
 ```
 
 DLC archives come from your own Steam installation; their integrity is checked before copying them locally. Class and race unlocks still follow the game’s rules.
+For an installed split build, you can also copy purchased `.teaac` archives directly into the adjacent `game/dlcs/` directory. Addons go in `game/addons/` or the game's existing user addon directory.
 
 ## Sources and licenses
 

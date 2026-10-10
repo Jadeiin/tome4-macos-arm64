@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Load every bundled dylib and exercise SDL/LuaJIT before and after relocation."""
 import json
+import argparse
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
-from project import APP, LOGS, ROOT
+from project import APPS, LOGS, ROOT, game_resources
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--layout", choices=APPS, default="bundled")
+args = parser.parse_args()
+APP = APPS[args.layout]
+RESOURCES = game_resources(APP)
 FRAMEWORKS = APP / "Contents/Frameworks"
 BUILD = ROOT / "build/native/checks"
 BUILD.mkdir(parents=True, exist_ok=True)
@@ -19,10 +25,10 @@ reports = []
 outputs = []
 
 
-def check(label, executable, directory):
-    result = subprocess.run([str(executable), str(directory), *names], text=True, capture_output=True)
+def check(label, executable, directory, resources):
+    result = subprocess.run([str(executable), str(directory), str(resources), *names], text=True, capture_output=True)
     outputs.append(label + "\n" + result.stdout + result.stderr)
-    (ROOT / "logs/bundled-runtime-check.log").write_text("\n".join(outputs))
+    (LOGS / f"bundled-runtime-check-{args.layout}.log").write_text("\n".join(outputs))
     if result.returncode:
         print(result.stdout + result.stderr)
         raise SystemExit(result.returncode)
@@ -40,16 +46,16 @@ def check(label, executable, directory):
     print(f"{label}: loaded all {len(bundled)} bundled libraries; SDL3, ARM64 JIT and LuaJIT modules passed.")
 
 
-check("original location", runner, FRAMEWORKS)
+check("original location", runner, FRAMEWORKS, RESOURCES)
 with tempfile.TemporaryDirectory(prefix="bundle-relocated-", dir=ROOT / "build") as temporary:
     contents = Path(temporary) / "Runtime Check.app/Contents"
     moved = contents / "Frameworks"
     shutil.copytree(FRAMEWORKS, moved, symlinks=True)
-    shutil.copytree(APP / "Contents/Resources/game/thirdparty/jit",
-                    contents / "Resources/game/thirdparty/jit")
+    resources = contents.parent.parent if args.layout == "split" else contents / "Resources"
+    shutil.copytree(RESOURCES / "game/thirdparty/jit", resources / "game/thirdparty/jit")
     binary = contents / "MacOS/runtime-check"
     binary.parent.mkdir()
     shutil.copy2(runner, binary)
-    check("relocated bundle", binary, moved)
-report = {"checks": reports, "temporary_bundle_cleaned": True, "passed": all(item["passed"] for item in reports)}
-(ROOT / "logs/bundled-runtime-check.json").write_text(json.dumps(report, indent=2) + "\n")
+    check("relocated bundle", binary, moved, resources)
+report = {"layout": args.layout, "checks": reports, "temporary_bundle_cleaned": True, "passed": all(item["passed"] for item in reports)}
+(LOGS / f"bundled-runtime-check-{args.layout}.json").write_text(json.dumps(report, indent=2) + "\n")

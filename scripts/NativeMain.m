@@ -5,14 +5,23 @@
 
 extern int tengine_main(int argc, char **argv);
 
+const char *te4_native_resource_path(void)
+{
+    NSBundle *bundle = [NSBundle mainBundle];
+    if (![bundle bundleIdentifier]) return NULL;
+    NSString *resources = [[bundle objectForInfoDictionaryKey:@"TE4AssetLayout"] isEqualToString:@"split"]
+        ? [[bundle bundlePath] stringByDeletingLastPathComponent] : [bundle resourcePath];
+    return [resources fileSystemRepresentation];
+}
+
 int main(int argc, char **argv)
 {
     @autoreleasepool {
         NSApplication *application = [NSApplication sharedApplication];
         [application setActivationPolicy:NSApplicationActivationPolicyRegular];
-        NSString *resources = [[NSBundle mainBundle] resourcePath];
-        if (resources && [[NSBundle mainBundle] bundleIdentifier]) {
-            if (chdir([resources fileSystemRepresentation]) != 0) {
+        const char *resources = te4_native_resource_path();
+        if (resources) {
+            if (chdir(resources) != 0) {
                 perror("Cannot enter the game resource directory");
                 return 1;
             }

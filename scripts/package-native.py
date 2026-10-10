@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the locally built engine and official full game resources."""
+"""Package the native engine in bundled and split asset layouts."""
 import argparse
 import json
 import plistlib
@@ -50,6 +50,7 @@ info = {
     "NSHighResolutionCapable": True,
     "LSApplicationCategoryType": "public.app-category.role-playing-games",
     "LSSupportsGameMode": True,
+    "TE4AssetLayout": "bundled",
 }
 (CONTENTS / "PkgInfo").write_bytes(b"APPL????")
 subprocess.run([sys.executable, str(ROOT / "scripts/bundle-runtime.py")], check=True)
@@ -64,3 +65,5 @@ subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(APP)], check=
 subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", str(APP)], check=True)
 APP.touch()
 print(APP)
+
+subprocess.run([sys.executable, str(ROOT / "scripts/package-split.py")], check=True)

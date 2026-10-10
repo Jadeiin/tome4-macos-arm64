@@ -1,15 +1,11 @@
 --- a/bootstrap/boot.lua
 +++ b/bootstrap/boot.lua
-@@ -22,7 +22,8 @@
- 	else
- 		-- This is a little un-OSX like: we grab our data from the folder containing T-Engine.app
- 		-- It is a bit strange but way way better for people to install addons and such
+@@ -23,4 +23 @@
+-		-- This is a little un-OSX like: we grab our data from the folder containing T-Engine.app
+-		-- It is a bit strange but way way better for people to install addons and such
 -		dir = dir:gsub("(.*"..fs.getPathSeparator()..").+", "%1"):gsub("(.*"..fs.getPathSeparator()..").+", "%1"):gsub("(.*"..fs.getPathSeparator()..").+", "%1")
-+		-- The native macOS core already returns Contents/Resources/.
-+		dir = dir
- --		dir = dir:gsub("(.*"..fs.getPathSeparator()..").+", "%1")..fs.getPathSeparator().."Resources"..fs.getPathSeparator()
- 	end
- 
+---		dir = dir:gsub("(.*"..fs.getPathSeparator()..").+", "%1")..fs.getPathSeparator().."Resources"..fs.getPathSeparator()
++		-- The native core returns the selected game resource directory.
 --- a/game/loader/init.lua
 +++ b/game/loader/init.lua
 @@ -144,6 +144,11 @@
@@ -125,42 +121,29 @@
  	{"newSurface", sdl_new_surface},
 --- a/src/getself.c
 +++ b/src/getself.c
-@@ -19,6 +19,8 @@
-     darkgod@te4.org
- */
- #include "getself.h"
-+#include <stdlib.h>
-+#include <stdint.h>
+@@ -88,19 +88,11 @@
+ #include <string.h>
+ #include <unistd.h>
  
- #if defined(SELFEXE_LINUX)
- #include <limits.h>
-@@ -90,7 +92,7 @@
- 
++extern const char *te4_native_resource_path(void);
++
  const char *get_self_executable(int argc, char **argv)
  {
 -	size_t sz = 0;
-+	uint32_t sz = 0;
- 	char *buf;
- 	char *sl;
- 
-@@ -99,7 +101,17 @@
- 	_NSGetExecutablePath(buf, &sz);
- 
- 	sl = strrchr(buf, '/');
-+	if (!sl) { free(buf); return NULL; }
- 	*(sl + 1) = '\0';
-+	/* Keep the complete game inside the application bundle. */
-+	const char *suffix = "/Contents/MacOS/";
-+	size_t len = strlen(buf), suffix_len = strlen(suffix);
-+	if (len >= suffix_len && !strcmp(buf + len - suffix_len, suffix)) {
-+		char *resources = realloc(buf, len + 5);
-+		if (!resources) { free(buf); return NULL; }
-+		buf = resources;
-+		strcpy(buf + len - suffix_len, "/Contents/Resources/");
-+	}
- 	return buf;
+-	char *buf;
+-	char *sl;
+-
+-	_NSGetExecutablePath(NULL, &sz);
+-	buf = (char*) malloc(++sz);
+-	_NSGetExecutablePath(buf, &sz);
+-
+-	sl = strrchr(buf, '/');
+-	*(sl + 1) = '\0';
+-	return buf;
++	return te4_native_resource_path();
  }
  
+ #import <sys/sysctl.h>
 --- a/src/lpeg/lptypes.h
 +++ b/src/lpeg/lptypes.h
 @@ -15,6 +15,7 @@

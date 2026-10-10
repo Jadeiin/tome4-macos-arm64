@@ -51,18 +51,25 @@ jobs:
           /usr/bin/python3 scripts/check-lua51-resolvers.py
           /usr/bin/python3 scripts/check-talent-coroutines.py
 
-      - name: Package app with its runtime libraries
+      - name: Package both asset layouts with their runtime libraries
         run: |
           /usr/bin/python3 scripts/package-native.py --without-dlcs --build-version "${{ github.run_number }}"
           /usr/bin/python3 scripts/verify-native.py
+          /usr/bin/python3 scripts/verify-native.py --layout split
           /usr/bin/python3 scripts/check-bundled-runtime.py
+          /usr/bin/python3 scripts/check-bundled-runtime.py --layout split
 
       - name: Check actual first floor and skill targeting
         env:
           ALSOFT_DRIVERS: 'null'
         run: /usr/bin/python3 scripts/check-first-floor.py --talents --seconds 180
 
-      - name: Create DMG and corresponding source archive
+      - name: Check split-layout first floor and skill targeting
+        env:
+          ALSOFT_DRIVERS: 'null'
+        run: /usr/bin/python3 scripts/check-first-floor.py --layout split --talents --seconds 180
+
+      - name: Create both DMGs and corresponding source archive
         run: /usr/bin/python3 scripts/make-release.py
 
       - name: Save release files

@@ -7,7 +7,14 @@ ToME **1.7.6** 的社区 ARM64 macOS 构建。使用官方完整源码和资源�
 
 ## 下载与安装
 
-从本仓库 [Releases](https://github.com/Jadeiin/tome4-macos-arm64/releases) 下载 `.dmg`，打开后将 `Tales of Maj’Eyal.app` 拖到 Applications。
+每个 [Release](https://github.com/Jadeiin/tome4-macos-arm64/releases) 提供两种 DMG：
+
+| 下载文件 | 布局 | 安装方法 |
+| --- | --- | --- |
+| `Tales-of-MajEyal-…-arm64.N.dmg` | 游戏资产位于 `.app` 内 | 将 `Tales of Maj'Eyal.app` 拖到 Applications。 |
+| `Tales-of-MajEyal-…-arm64.N-split.dmg` | `.app` 与 `game/`、`bootstrap/` 并列 | 将整个 `Tales of Maj'Eyal` 文件夹拖到 Applications 或其他位置，保持目录内容在一起。 |
+
+两种布局使用同一引擎，运行库均捆绑在 `.app` 内。分离布局可直接管理 DLC 和 addon 文件，无需打开应用包。
 最低 macOS 版本见对应 Release 和 `build-info.json`；CI 使用 `macos-15` 的 ARM64 runner，打包时也会检查动态库要求的系统版本。
 
 应用使用 ad hoc 签名，未进行 Apple 公证。若 macOS 拦截，确认下载来源后在系统设置的“隐私与安全性”中允许打开。
@@ -32,6 +39,7 @@ open "dist/Tales of Maj'Eyal.app"
 
 `project.json` 固定官方源码版本、下载地址和 SHA-256。下载器校验完整归档后再提取；若源码目录已存在，会保留它并退出。
 已有源码时，重新构建可直接从 `build-native.py` 开始。
+`package-native.py` 同时生成 `dist/Tales of Maj'Eyal.app` 和 `dist/Tales of Maj'Eyal/`；打开后者目录中的应用即可使用分离布局。
 
 Brewfile 声明 9 个直接依赖：`pkgconf`、`sdl2-compat`、`sdl2_image`、`sdl2_ttf`、`libpng`、`libogg`、`libvorbis`、`openal-soft`、`luajit`。间接依赖由 Homebrew 安装。
 OpenAL Soft 为 keg-only，构建脚本已设置 pkg-config 路径。
@@ -69,6 +77,8 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 /usr/bin/python3 scripts/check-talent-coroutines.py
 /usr/bin/python3 scripts/verify-native.py
 /usr/bin/python3 scripts/check-bundled-runtime.py
+/usr/bin/python3 scripts/verify-native.py --layout split
+/usr/bin/python3 scripts/check-bundled-runtime.py --layout split
 ```
 
 覆盖源码归档与发布文件校验、虚拟文件加载、铭文解析、真实技能代码的协程暂停与收尾，以及应用架构、动态链接、签名和迁移目录后的库加载。
@@ -76,6 +86,7 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 
 ```sh
 /usr/bin/python3 scripts/check-first-floor.py --talents
+/usr/bin/python3 scripts/check-first-floor.py --layout split --talents
 ```
 
 它使用独立配置创建矮人 Bulwark，进入首层，生成 100 枚铭文，再取消并完成盾牌连击目标选择，随后关闭测试游戏。
@@ -90,7 +101,7 @@ macOS 系统库和框架由系统提供。Homebrew 更新后重新打包会使�
 1. 在 `macos-15` 原生 ARM64 runner 上安装 Homebrew 依赖。
 2. 下载并校验官方完整源码，应用补丁并编译。
 3. 执行 LuaJIT 回归、架构和签名检查、迁移后的运行库检查，以及真实首层与技能目标选择检查。
-4. 用 `hdiutil` 创建并校验 DMG，附带源码包、构建信息和 SHA-256 校验值。
+4. 用 `hdiutil` 创建并校验两种布局的 DMG，附带共用的源码包、构建信息和 SHA-256 校验值。
 5. 对 `v1.7.6-arm64.N` tag，在独立发布 job 中校验文件 SHA-256，再由一个 `run` step 调用 runner 自带的 **GitHub CLI** 发布 Release。
 
 普通分支与 PR 构建提供 Actions artifacts；只有成功的 tag 构建发布 Release。
@@ -119,7 +130,7 @@ git push origin v1.7.6-arm64.4
 ```
 
 输出位于 `dist/release/`。重新构建同一版本时会覆盖该版本的生成文件。
-普通本机构建保留导入的 DLC；公开 DMG 打包会拒绝包含 DLC 文件的应用。
+普通本机构建会在两种布局中包含导入的 DLC；公开 DMG 打包会拒绝包含 DLC 文件的布局。
 
 ## 导入已购买的 DLC
 
@@ -129,6 +140,7 @@ git push origin v1.7.6-arm64.4
 ```
 
 DLC 压缩档案来自用户自己的 Steam 安装，检查完整性后在本机复制。职业和种族解锁仍遵循游戏规则。
+已安装分离版时，也可直接将购买的 `.teaac` 压缩档案复制到应用旁的 `game/dlcs/`；addon 放在 `game/addons/` 或游戏原有的用户 addon 目录中。
 
 ## 来源与许可
 

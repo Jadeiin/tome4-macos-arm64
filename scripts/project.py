@@ -1,6 +1,7 @@
 """Shared paths and the pinned official source release."""
 import hashlib
 import json
+import plistlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -9,8 +10,16 @@ VERSION = PROJECT["version"]
 SOURCE = ROOT / PROJECT["source_directory"]
 ARCHIVE = ROOT / "downloads" / PROJECT["source_archive"]
 APP = ROOT / "dist" / "Tales of Maj'Eyal.app"
+SPLIT = ROOT / "dist" / "Tales of Maj'Eyal"
+APPS = {"bundled": APP, "split": SPLIT / APP.name}
 LOGS = ROOT / "logs"
 LOGS.mkdir(parents=True, exist_ok=True)
+
+
+def game_resources(app):
+    with (app / "Contents/Info.plist").open("rb") as stream:
+        info = plistlib.load(stream)
+    return app.parent if info["TE4AssetLayout"] == "split" else app / "Contents/Resources"
 
 
 def sha256(path):

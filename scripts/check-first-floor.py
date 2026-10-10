@@ -10,17 +10,20 @@ import subprocess
 import time
 import zipfile
 
-from project import APP, LOGS, ROOT
+from project import APPS, LOGS, ROOT, game_resources
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--layout", choices=APPS, default="bundled")
 parser.add_argument("--seconds", type=int, default=120, help="Maximum test runtime")
 parser.add_argument("--talents", action="store_true", help="Also cancel and complete real Shield Pummel targeting")
 parser.add_argument("--require-dlcs", action="store_true", help="Also require all three paid DLCs to load")
 args = parser.parse_args()
+APP = APPS[args.layout]
+RESOURCES = game_resources(APP)
 dlc_names = {"ashes-urhrok": "ashes-urhrok.teaac", "orcs": "orcs.teaac", "cults": "cults.teaac"}
 expected_dlcs = [name for name, archive in dlc_names.items()
-                 if args.require_dlcs or (APP / "Contents/Resources/game/dlcs" / archive).is_file()]
+                 if args.require_dlcs or (RESOURCES / "game/dlcs" / archive).is_file()]
 stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-log_prefix = "luajit-gameplay" if args.talents else "luajit-first-floor"
+log_prefix = ("luajit-gameplay" if args.talents else "luajit-first-floor") + f"-{args.layout}"
 home = ROOT / "build" / f"runtime-floor-{stamp}"
 user = home / "Library/Application Support/T-Engine/4.0"
 settings = user / "settings"
@@ -161,7 +164,7 @@ command = [str(APP / "Contents/MacOS/t-engine"), "--home", str(home),
 print(f"Testing {'first floor and targeting' if args.talents else 'the first floor'} with an isolated profile: {home}", flush=True)
 started = time.monotonic()
 with (logs / f"{log_prefix}-stderr.log").open("w") as output:
-    process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(command, cwd="/tmp", stdout=output, stderr=subprocess.STDOUT)
     try:
         ready_at = None
         while process.poll() is None and time.monotonic() - started < args.seconds:
@@ -198,7 +201,7 @@ with (logs / f"{log_prefix}-stderr.log").open("w") as output:
                 "target_selected": "[NATIVE TALENT CHECK] selected=shield-pummel attacks=2 cooldown=true" in current,
             })
         generation = re.findall(r"\[NATIVE FLOOR CHECK\] generation_ms=(\d+) zone=(\S+)", current)
-        report = {"time": stamp, "profile": str(home), "elapsed_seconds": round(time.monotonic()-started, 2),
+        report = {"layout": args.layout, "time": stamp, "profile": str(home), "elapsed_seconds": round(time.monotonic()-started, 2),
                   "expected_dlcs": expected_dlcs,
                   "checks": checks, "generation_times_ms": [{"zone": zone, "ms": int(ms)} for ms, zone in generation],
                   "passed": all(checks.values())}

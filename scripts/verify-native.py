@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Verify native ARM64 architecture and that runtime links stay inside the app."""
 import json
+import argparse
 import platform
 import subprocess
 from pathlib import Path
 
 from macho import inspect, resolve, system_library
 
-from project import APP, LOGS, ROOT
+from project import APPS, LOGS
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--layout", choices=APPS, default="bundled")
+args = parser.parse_args()
+APP = APPS[args.layout]
 EXECUTABLE = APP / "Contents/MacOS/t-engine"
 FRAMEWORKS = APP / "Contents/Frameworks"
 game = inspect(EXECUTABLE)
@@ -46,8 +51,8 @@ expected = {record["name"] for record in manifest["runtime_libraries"]}
 if actual != expected:
     raise RuntimeError(f"Runtime manifest differs from the resolved graph: {actual ^ expected}")
 subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(APP)], check=True)
-report = {"host_architecture": platform.machine(), "macOS": platform.mac_ver()[0],
+report = {"layout": args.layout, "host_architecture": platform.machine(), "macOS": platform.mac_ver()[0],
           "executable": str(EXECUTABLE), "runtime_requires_homebrew": False,
           "runtime_binaries": checked}
-(ROOT / "logs/native-architectures.json").write_text(json.dumps(report, indent=2) + "\n")
+(LOGS / f"native-architectures-{args.layout}.json").write_text(json.dumps(report, indent=2) + "\n")
 print(f"Verified native ARM64 game and {len(checked) - 1} bundled runtime libraries; all non-system links stay inside the app.")

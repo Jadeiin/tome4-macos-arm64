@@ -62,7 +62,8 @@ def inspect_run(forge, repository, commit, tag, minutes, report):
                 release = forge.api(f"repos/{repository}/releases/tags/{tag}")
                 names = {asset["name"] for asset in release["assets"]}
                 complete = ("SHA256SUMS" in names and "build-info.json" in names
-                            and any(name.endswith('.dmg') for name in names)
+                            and any(name.endswith('.dmg') and not name.endswith('-split.dmg') for name in names)
+                            and any(name.endswith('-split.dmg') for name in names)
                             and any(name.endswith('-source.tar.gz') for name in names))
                 if release["draft"] or not complete:
                     raise RuntimeError("Actions passed but the public DMG release is missing.")
